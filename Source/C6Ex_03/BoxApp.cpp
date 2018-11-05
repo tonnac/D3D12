@@ -174,12 +174,13 @@ void BoxApp::Draw(const GameTimer& gt)
 	mCommandList->SetGraphicsRootSignature(mRootSignature.Get());
 
 	mCommandList->IASetVertexBuffers(0, 1, &mBoxGeo->VertexBufferView());
-	mCommandList->IASetIndexBuffer(&mBoxGeo->IndexBufferView());
-	mCommandList->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+//	mCommandList->IASetIndexBuffer(&mBoxGeo->IndexBufferView());
+	mCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
 	mCommandList->SetGraphicsRootDescriptorTable(0, mCbvHeap->GetGPUDescriptorHandleForHeapStart());
 
-	mCommandList->DrawIndexedInstanced(mBoxGeo->DrawArgs["box"].IndexCount, 1, 0, 0, 0);
+	mCommandList->DrawInstanced(mBoxGeo->DrawArgs["box"].IndexCount, 1, 0, 0);
+//	mCommandList->DrawIndexedInstanced(mBoxGeo->DrawArgs["box"].IndexCount, 1, 0, 0, 0);
 
 	mCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(CurrentBackBuffer(),
 		D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
@@ -299,14 +300,14 @@ void BoxApp::BuildBoxGeometry()
 {
 	std::array<Vertex, 8> vertices =
 	{
-		Vertex({ XMFLOAT3(-1.0f, -1.0f, -1.0f), XMFLOAT4(Colors::White) }),
-		Vertex({ XMFLOAT3(-1.0f, +1.0f, -1.0f), XMFLOAT4(Colors::Black) }),
-		Vertex({ XMFLOAT3(+1.0f, +1.0f, -1.0f), XMFLOAT4(Colors::Red) }),
-		Vertex({ XMFLOAT3(+1.0f, -1.0f, -1.0f), XMFLOAT4(Colors::Green) }),
-		Vertex({ XMFLOAT3(-1.0f, -1.0f, +1.0f), XMFLOAT4(Colors::Blue) }),
-		Vertex({ XMFLOAT3(-1.0f, +1.0f, +1.0f), XMFLOAT4(Colors::Yellow) }),
-		Vertex({ XMFLOAT3(+1.0f, +1.0f, +1.0f), XMFLOAT4(Colors::Cyan) }),
-		Vertex({ XMFLOAT3(+1.0f, -1.0f, +1.0f), XMFLOAT4(Colors::Magenta) })
+		Vertex({ XMFLOAT3(-0.8f, -0.8f, 0.0f), XMFLOAT4(Colors::White) }),
+		Vertex({ XMFLOAT3(-0.6f, +0.8f, 0.0f), XMFLOAT4(Colors::Black) }),
+		Vertex({ XMFLOAT3(-0.2f, -0.2f, 0.0f), XMFLOAT4(Colors::Red) }),
+		Vertex({ XMFLOAT3(+0.0f, +0.3f, 0.0f), XMFLOAT4(Colors::Green) }),
+		Vertex({ XMFLOAT3(+0.2f, -0.3f, 0.0f), XMFLOAT4(Colors::Blue) }),
+		Vertex({ XMFLOAT3(+0.5f, +0.3f, 0.0f), XMFLOAT4(Colors::Yellow) }),
+		Vertex({ XMFLOAT3(+0.7f, +0.2f, 0.0f), XMFLOAT4(Colors::Cyan) }),
+		Vertex({ XMFLOAT3(+0.9f, +0.9f, 0.0f), XMFLOAT4(Colors::Magenta) })
 	};
 
 	std::array<std::uint16_t, 36> indices =

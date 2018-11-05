@@ -369,16 +369,6 @@ bool D3DApp::InitDirect3D()
 		ThrowIfFailed(D3D12CreateDevice(pWarpAdapter.Get(), D3D_FEATURE_LEVEL_12_0, IID_PPV_ARGS(&md3dDevice)));
 	}
 
-	D3D_FEATURE_LEVEL featureLevel[] =
-	{
-		D3D_FEATURE_LEVEL_12_1,
-		D3D_FEATURE_LEVEL_12_0,
-		D3D_FEATURE_LEVEL_11_0
-	};
-	D3D12_FEATURE_DATA_FEATURE_LEVELS featureInfo;
-	featureInfo.NumFeatureLevels = 3;
-	featureInfo.pFeatureLevelsRequested = featureLevel;
-	md3dDevice->CheckFeatureSupport(D3D12_FEATURE_FEATURE_LEVELS, &featureInfo, sizeof(featureInfo));
 	ThrowIfFailed(md3dDevice->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&mFence)));
 
 	mRtvDescriptorSize = md3dDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);

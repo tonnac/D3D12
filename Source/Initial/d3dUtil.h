@@ -18,9 +18,9 @@
 #include <fstream>
 #include <sstream>
 #include <cassert>
-#include <cstdlib>
 #include <tchar.h>
 #include "d3dx12.h"
+
 
 inline std::wstring AnsiToWString(const std::string& str)
 {
@@ -54,12 +54,4 @@ public:
 
 #ifndef ReleaseCom
 #define ReleaseCom(x) {if(x) {x->Release(); x = nullptr;} }
-#endif
-
-#ifndef CASTING
-#define CASTING(x, y) static_cast<x>((y))
-#endif
-
-#ifndef RE_CAST
-#define RE_CAST(x, y) reinterpret_cast<x>((y))
 #endif

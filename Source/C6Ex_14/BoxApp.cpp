@@ -15,6 +15,8 @@ struct Vertex
 struct ObjectConstatns
 {
 	XMFLOAT4X4 WorldViewProj = MathHelper::Identity4x4();
+	XMFLOAT4 gPulseColor;
+	float gTime;
 };
 
 class BoxApp : public D3DApp
@@ -148,6 +150,8 @@ void BoxApp::Update(const GameTimer& gt)
 
 	ObjectConstatns objConstants;
 	XMStoreFloat4x4(&objConstants.WorldViewProj, XMMatrixTranspose(worldViewProj));
+	objConstants.gTime = mTimer.TotalTime();
+	objConstants.gPulseColor = XMFLOAT4(Colors::Chocolate);
 	mObjectCB->CopyData(0, objConstants);
 }
 
