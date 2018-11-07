@@ -212,7 +212,28 @@ void BoxApp::Draw(const GameTimer& gt)
 
 #elif defined RootConstant
 
-	mCommandList->SetGraphicsRoot32BitConstants(0, 16, (LPVOID)mObjectCB->Resource()->GetGPUVirtualAddress(), ??);
+	float fTime = mTimer.TotalTime();
+
+	float x = mRadius * sinf(mPhi) * cosf(mTheta);
+	float z = mRadius * sinf(mPhi) * sinf(mTheta);
+	float y = mRadius * cosf(mPhi);
+
+	XMVECTOR pos = XMVectorSet(x, y, z, 1.0f);
+	XMVECTOR target = XMVectorZero();
+	XMVECTOR up = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
+
+	XMMATRIX view = XMMatrixLookAtLH(pos, target, up);
+	XMStoreFloat4x4(&mView, view);
+
+	XMMATRIX world = XMLoadFloat4x4(&mWorld);
+	XMMATRIX proj = XMLoadFloat4x4(&mProj);
+	XMMATRIX worldViewProj = world * view * proj;
+
+	ObjectConstants objConstants;
+	XMStoreFloat4x4(&objConstants.WorldViewProj, XMMatrixTranspose(worldViewProj));
+
+	mCommandList->SetGraphicsRoot32BitConstants(0, 16, (LPVOID)&objConstants.WorldViewProj, 0);
+	mCommandList->SetGraphicsRoot32BitConstants(1, 1, &fTime, 0);
 
 #endif
 
@@ -299,9 +320,10 @@ void BoxApp::BuildConstantBuffer()
 	cbvDesc.SizeInBytes = objCbByteSize;
 
 	md3dDevice->CreateConstantBufferView(&cbvDesc, cbvHandle);
+
 #endif
 
-/////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 	mCBData = std::make_unique<UploadBuffer<ObjectConstant>>(md3dDevice.Get(), 1, true);
 
@@ -317,6 +339,7 @@ void BoxApp::BuildConstantBuffer()
 	cbvDesc2.SizeInBytes = objCbByteSize;
 
 	md3dDevice->CreateConstantBufferView(&cbvDesc2, cbvHandle);
+
 #endif
 }
 
