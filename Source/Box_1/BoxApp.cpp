@@ -2,6 +2,11 @@
 #include "MathHelper.h"
 #include "UploadBuffer.h"
 
+//#define DescriptorTable
+//#define RootDescriptor
+#define RootConstant
+
+
 using Microsoft::WRL::ComPtr;
 using namespace DirectX;
 using namespace DirectX::PackedVector;
@@ -114,7 +119,9 @@ bool BoxApp::initialize()
 
 	ThrowIfFailed(mCommandList->Reset(mDirectCmdListAlloc.Get(), nullptr));
 
+#ifdef DescriptorTable
 	BuildDescriptorHeaps();
+#endif
 	BuildConstantBuffer();
 	BuildRootSignature();
 	BuildShaderAndInputLayout();
@@ -182,17 +189,32 @@ void BoxApp::Draw(const GameTimer& gt)
 
 	mCommandList->OMSetRenderTargets(1, &CurrentBackBufferView(), true, &DepthStencilView());
 
-	ID3D12DescriptorHeap* descriptorHeaps[] = { mCbvHeap.Get() };
-	mCommandList->SetDescriptorHeaps((UINT)std::size(descriptorHeaps), descriptorHeaps);
-
-	mCommandList->SetGraphicsRootSignature(mRootSignature.Get());
-
 	mCommandList->IASetVertexBuffers(0, 1, &mBoxGeo->VertexBufferView());
 	mCommandList->IASetIndexBuffer(&mBoxGeo->IndexBufferView());
 	mCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-	mCommandList->SetGraphicsRootDescriptorTable(0, mCbvHeap->GetGPUDescriptorHandleForHeapStart());
+	mCommandList->SetGraphicsRootSignature(mRootSignature.Get());
+
+#if defined DescriptorTable
+
+	ID3D12DescriptorHeap* descriptorHeaps[] = { mCbvHeap.Get() };
+	mCommandList->SetDescriptorHeaps((UINT)std::size(descriptorHeaps), descriptorHeaps);
+
+	CD3DX12_GPU_DESCRIPTOR_HANDLE CbvHandle(mCbvHeap->GetGPUDescriptorHandleForHeapStart());
+	mCommandList->SetGraphicsRootDescriptorTable(0, CbvHandle);
+	CbvHandle.Offset(1, mCbvSrvUavDescriptorSize);
+	mCommandList->SetGraphicsRootDescriptorTable(1, CbvHandle);
+
+#elif defined RootDescriptor
+
+	mCommandList->SetGraphicsRootConstantBufferView(0, mObjectCB->Resource()->GetGPUVirtualAddress());
 	mCommandList->SetGraphicsRootConstantBufferView(1, mCBData->Resource()->GetGPUVirtualAddress());
+
+#elif defined RootConstant
+
+	mCommandList->SetGraphicsRoot32BitConstants(0, 16, (LPVOID)mObjectCB->Resource()->GetGPUVirtualAddress(), ??);
+
+#endif
 
 	mCommandList->DrawIndexedInstanced(mBoxGeo->DrawArgs["box"].IndexCount, 1, 0, 0, 0);
 
@@ -254,7 +276,7 @@ void BoxApp::BuildDescriptorHeaps()
 	D3D12_DESCRIPTOR_HEAP_DESC cbvHeapDesc = {};
 	cbvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 	cbvHeapDesc.NodeMask = 0;
-	cbvHeapDesc.NumDescriptors = 1;
+	cbvHeapDesc.NumDescriptors = 2;
 	cbvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 	ThrowIfFailed(md3dDevice->CreateDescriptorHeap(&cbvHeapDesc, IID_PPV_ARGS(mCbvHeap.GetAddressOf())));
 }
@@ -262,6 +284,9 @@ void BoxApp::BuildDescriptorHeaps()
 void BoxApp::BuildConstantBuffer()
 {
 	mObjectCB = std::make_unique<UploadBuffer<ObjectConstants>>(md3dDevice.Get(), 1, true);
+
+#ifdef DescriptorTable
+	CD3DX12_CPU_DESCRIPTOR_HANDLE cbvHandle(mCbvHeap->GetCPUDescriptorHandleForHeapStart());
 
 	UINT objCbByteSize = d3dUtil::CalcConstantBufferByteSize(sizeof(ObjectConstants));
 
@@ -273,13 +298,15 @@ void BoxApp::BuildConstantBuffer()
 	cbvDesc.BufferLocation = cbAddress;
 	cbvDesc.SizeInBytes = objCbByteSize;
 
-	md3dDevice->CreateConstantBufferView(&cbvDesc, mCbvHeap->GetCPUDescriptorHandleForHeapStart());
+	md3dDevice->CreateConstantBufferView(&cbvDesc, cbvHandle);
+#endif
 
 /////////////////////
 
 	mCBData = std::make_unique<UploadBuffer<ObjectConstant>>(md3dDevice.Get(), 1, true);
 
-	CD3DX12_CPU_DESCRIPTOR_HANDLE cbvHandle(mCbvHeap->GetCPUDescriptorHandleForHeapStart());
+#ifdef DescriptorTable
+
 	cbvHandle.Offset(1, mCbvSrvUavDescriptorSize);
 
 	D3D12_GPU_VIRTUAL_ADDRESS cbAddress2 = mCBData->Resource()->GetGPUVirtualAddress();
@@ -289,19 +316,33 @@ void BoxApp::BuildConstantBuffer()
 	cbvDesc2.BufferLocation = cbAddress2;
 	cbvDesc2.SizeInBytes = objCbByteSize;
 
-	md3dDevice->CreateConstantBufferView(&cbvDesc2, mCbvHeap->GetCPUDescriptorHandleForHeapStart());
-
+	md3dDevice->CreateConstantBufferView(&cbvDesc2, cbvHandle);
+#endif
 }
 
 void BoxApp::BuildRootSignature()
 {
 	CD3DX12_ROOT_PARAMETER slotRootParameter[2];
+#ifdef RootDescriptor
+
+	slotRootParameter[0].InitAsConstantBufferView(0);
+	slotRootParameter[1].InitAsConstantBufferView(1);
+
+#elif defined DescriptorTable
 
 	CD3DX12_DESCRIPTOR_RANGE cbvTable;
 	cbvTable.Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 0);
+	CD3DX12_DESCRIPTOR_RANGE cbvTable1;
+	cbvTable1.Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 1);
 	slotRootParameter[0].InitAsDescriptorTable(1, &cbvTable);
-	slotRootParameter[1].InitAsConstantBufferView(1);
+	slotRootParameter[1].InitAsDescriptorTable(1, &cbvTable1);
 
+#elif defined RootConstant
+
+	slotRootParameter[0].InitAsConstants(16, 0);
+	slotRootParameter[1].InitAsConstants(1, 1);
+
+#endif
 	CD3DX12_ROOT_SIGNATURE_DESC rootSigDesc((UINT)std::size(slotRootParameter), 
 		slotRootParameter, 0, nullptr,
 		D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);

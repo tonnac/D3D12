@@ -34,6 +34,6 @@ VertexOut VS(VertexIn vIn)
 float4 PS(VertexOut pIn) : SV_TARGET
 {
 	float4 outColor = float4(pIn.Color);
-	outColor * (cos(gTime) * 0.5f + 0.5f);
-	return pIn.Color;
+	outColor = outColor * (cos(gTime) * 0.5f + 0.5f);
+	return outColor;
 }
