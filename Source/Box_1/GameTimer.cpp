@@ -1,0 +1,85 @@
+#include <Windows.h>
+#include "GameTimer.h"
+#include "d3dUtil.h"
+
+GameTimer::GameTimer() 
+: mSecondsPerCount(0.0), mDeltaTime(-1.0), mBaseTime(0),
+  mPausedTime(0), mPrevTime(0), mCurrTime(0), mStopped(false)
+{
+	__int64 countsPerSec;
+	QueryPerformanceFrequency(RE_CAST(LARGE_INTEGER*, &countsPerSec));
+	mSecondsPerCount = 1.0 / CASTING(double, countsPerSec);
+}
+
+float GameTimer::TotalTime() const
+{
+	if (mStopped == true)
+	{
+		return CASTING(float, (((mStopTime - mPausedTime) - mBaseTime)*mSecondsPerCount));
+	}
+	else
+	{
+		return CASTING(float, (((mCurrTime - mPausedTime) - mBaseTime)*mSecondsPerCount));
+	}
+
+
+}
+float GameTimer::DeltaTime() const
+{
+	return CASTING(float, mDeltaTime);
+}
+
+void GameTimer::Reset()
+{
+	__int64 currTime;
+	QueryPerformanceCounter(RE_CAST(LARGE_INTEGER*, &currTime));
+
+	mBaseTime = currTime;
+	mPrevTime = currTime;
+	mStopTime = 0;
+	mStopped  = false;
+}
+void GameTimer::Start()
+{
+	__int64 startTime;
+	QueryPerformanceCounter(RE_CAST(LARGE_INTEGER*, &startTime));
+
+	if (mStopped == true)
+	{
+		mPausedTime += (startTime - mStopTime);
+
+		mPrevTime = startTime;
+		mStopTime = 0;
+		mStopped  = false;
+	}
+}
+void GameTimer::Stop()
+{
+	if (mStopped == false)
+	{
+		__int64 currTime;
+		QueryPerformanceCounter(RE_CAST(LARGE_INTEGER*, &currTime));
+
+		mStopTime = currTime;
+		mStopped  = true;
+	}
+}
+void GameTimer::Tick()
+{
+	if (mStopped == true)
+	{
+		mDeltaTime = 0.0;
+		return;
+	}
+
+	__int64 currTime;
+	QueryPerformanceCounter(RE_CAST(LARGE_INTEGER*, &currTime));
+	mCurrTime = currTime;
+	mDeltaTime = (mCurrTime - mPrevTime) * mSecondsPerCount;
+	mPrevTime = mCurrTime;
+
+	if (mDeltaTime < 0.0)
+	{
+		mDeltaTime = 0.0;
+	}
+}
