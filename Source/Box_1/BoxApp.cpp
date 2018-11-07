@@ -122,7 +122,9 @@ bool BoxApp::initialize()
 #ifdef DescriptorTable
 	BuildDescriptorHeaps();
 #endif
+#ifndef RootConstant
 	BuildConstantBuffer();
+#endif
 	BuildRootSignature();
 	BuildShaderAndInputLayout();
 	BuildBoxGeometry();
