@@ -2,14 +2,17 @@
 #include "MathHelper.h"
 #include "UploadBuffer.h"
 
-//#define DescriptorTable
+#define DescriptorTable
 //#define RootDescriptor
-#define RootConstant
+//#define RootConstant
 
 
 using Microsoft::WRL::ComPtr;
 using namespace DirectX;
 using namespace DirectX::PackedVector;
+
+
+XMMATRIX LookatLH(FXMVECTOR, FXMVECTOR, FXMVECTOR);
 
 struct Vertex
 {
@@ -159,11 +162,12 @@ void BoxApp::Update(const GameTimer& gt)
 	XMVECTOR up = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
 
 	XMMATRIX view = XMMatrixLookAtLH(pos, target, up);
-	XMStoreFloat4x4(&mView, view);
+	XMMATRIX view1 = LookatLH(pos, target, up);
+	XMStoreFloat4x4(&mView, view1);
 
 	XMMATRIX world = XMLoadFloat4x4(&mWorld);
 	XMMATRIX proj = XMLoadFloat4x4(&mProj);
-	XMMATRIX worldViewProj = world * view * proj;
+	XMMATRIX worldViewProj = world * view1 * proj;
 
 	ObjectConstants objConstants;
 	XMStoreFloat4x4(&objConstants.WorldViewProj, XMMatrixTranspose(worldViewProj));
@@ -498,4 +502,29 @@ void BoxApp::BuildPSO()
 	psoDesc.DSVFormat = mDepthStencilFormat;
 
 	ThrowIfFailed(md3dDevice->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(mPSO.GetAddressOf())));
+}
+
+XMMATRIX LookatLH(FXMVECTOR EyePosition, FXMVECTOR FocusPosition, FXMVECTOR UpDirection)
+{
+	XMVECTOR Eye = XMVector3Normalize(FocusPosition - EyePosition);
+	Eye = XMVectorSetW(Eye, 0.0f);
+
+	float fScala;
+	XMStoreFloat(&fScala, XMVector3Dot(Eye, UpDirection));
+
+	XMVECTOR e2 = XMVector3Normalize(UpDirection - (fScala * Eye));
+	XMVECTOR e3 = XMVector3Cross(e2, Eye);
+
+	XMVECTOR e4 = EyePosition - FocusPosition;
+	XMFLOAT3 t0;
+	XMStoreFloat3(&t0, e4);
+
+	XMMATRIX t1 = XMMatrixTranslation(t0.x, t0.y, t0.z);
+	t1 = XMMatrixInverse(&XMMatrixDeterminant(t1), t1);
+	
+	XMMATRIX r1(e3, e2, Eye, XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f));
+	r1 = XMMatrixTranspose(r1);
+
+	return t1 * r1;
+
 }
