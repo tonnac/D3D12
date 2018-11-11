@@ -210,7 +210,7 @@ GeometryGenerator::MeshData GeometryGenerator::CreateGeosphere(float radius, uin
 		float theta = atan2f(meshData.Vertices[i].Position.z, meshData.Vertices[i].Position.x);
 
 		if (theta < 0.0f)
-			theta += XM_2PI;
+			theta + XM_2PI;
 
 		float phi = acosf(meshData.Vertices[i].Position.y / radius);
 

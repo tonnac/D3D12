@@ -47,6 +47,23 @@ public:
 
 	static float AngleFromXY(float x, float y);
 
+	static DirectX::XMVECTOR SphericalToCartesian(float radius, float theta, float phi)
+	{
+		return DirectX::XMVectorSet(radius * sinf(phi) * cosf(theta),
+									radius * cosf(phi),
+									radius * sinf(phi) * sinf(theta),
+									1.0f);
+	}
+
+	static DirectX::XMMATRIX InverseTranspose(DirectX::CXMMATRIX M)
+	{
+		DirectX::XMMATRIX A = M;
+		A.r[3] = DirectX::XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f);
+
+		DirectX::XMVECTOR det = DirectX::XMMatrixDeterminant(A);
+		return DirectX::XMMatrixTranspose(DirectX::XMMatrixInverse(&det, A));
+	}
+
 	static DirectX::XMFLOAT4X4 Identity4x4()
 	{
 		static DirectX::XMFLOAT4X4 I(

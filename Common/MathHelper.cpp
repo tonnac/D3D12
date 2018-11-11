@@ -4,13 +4,13 @@
 
 using namespace DirectX;
 
-const float MathHelper::Infinity = FLT_MAX;
-const float MathHelper::Pi		 = 3.1415926535f;
+constexpr float MathHelper::Infinity = FLT_MAX;
+constexpr float MathHelper::Pi		 = 3.1415926535f;
 
 float MathHelper::AngleFromXY(float x, float y)
 {
 	float theta = 0.0f;
-
+	
 	if (x >= 0.0f)
 	{
 		theta = atanf(y / x);

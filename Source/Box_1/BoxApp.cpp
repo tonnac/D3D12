@@ -2,9 +2,9 @@
 #include "MathHelper.h"
 #include "UploadBuffer.h"
 
-#define DescriptorTable
+//#define DescriptorTable
 //#define RootDescriptor
-//#define RootConstant
+#define RootConstant
 
 
 using Microsoft::WRL::ComPtr;
@@ -153,6 +153,7 @@ void BoxApp::OnResize()
 
 void BoxApp::Update(const GameTimer& gt)
 {
+#ifndef RootConstant
 	float x = mRadius * sinf(mPhi) * cosf(mTheta);
 	float z = mRadius * sinf(mPhi) * sinf(mTheta);
 	float y = mRadius * cosf(mPhi);
@@ -175,6 +176,7 @@ void BoxApp::Update(const GameTimer& gt)
 	ObjectConstant objConstatnt;
 	objConstatnt.Time = mTimer.TotalTime();
 	mCBData->CopyData(0, objConstatnt);
+#endif
 }
 
 void BoxApp::Draw(const GameTimer& gt)

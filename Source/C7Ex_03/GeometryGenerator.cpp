@@ -1,8 +1,12 @@
 #include "GeometryGenerator.h"
 #include <algorithm>
 #include <array>
+#include <fstream>
+#include <sstream>
+#include <string>
 
 using namespace DirectX;
+using namespace std;
 
 GeometryGenerator::MeshData GeometryGenerator::CreateBox(float width, float height, float depth, uint32 numSubdivisions)
 {
@@ -352,6 +356,61 @@ GeometryGenerator::MeshData GeometryGenerator::CreateQuad(float x, float y, floa
 	return dd;
 }
 
+GeometryGenerator::MeshData GeometryGenerator::CreateSkull()
+{
+	MeshData meshData;
+
+	ifstream fp;
+	string buf;
+	int num;
+	fp.open("Model\\skull.txt", ios::in);
+	if (!fp.is_open())
+	{
+		int a = 5;
+	}
+
+	fp >> buf >> num;
+	uint32 VertexCount = num;
+	meshData.Vertices.resize(VertexCount);
+	fp >> buf >> num;
+	uint32 IndicesCount = num;
+	meshData.Indices32.resize(IndicesCount * 3);
+	getline(fp, buf);
+	getline(fp, buf);
+	getline(fp, buf);
+
+	for (uint32 i = 0; i < VertexCount; ++i)
+	{
+		XMFLOAT3 Pos;
+		XMFLOAT3 Nor;
+		getline(fp, buf);
+		istringstream is(buf);
+		is >> Pos.x >> Pos.y >> Pos.z >> Nor.x >> Nor.y >> Nor.z;
+		meshData.Vertices[i].Position = Pos;
+		meshData.Vertices[i].Normal = Nor;
+	}
+
+	getline(fp, buf);
+	getline(fp, buf);
+	getline(fp, buf);
+
+	uint32 k = 0;
+	for (uint32 i = 0; i < IndicesCount; ++i)
+	{
+		XMINT3 Indices;
+		getline(fp, buf);
+		istringstream is(buf);
+		is >> Indices.x >> Indices.y >> Indices.z;
+
+		meshData.Indices32[k] = Indices.x;
+		meshData.Indices32[k + 1] = Indices.y;
+		meshData.Indices32[k + 2] = Indices.z;
+
+		k += 3;
+	}
+
+	return meshData;
+}
 
 void GeometryGenerator::Subdivide(MeshData& meshData)
 {
