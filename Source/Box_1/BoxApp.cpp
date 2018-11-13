@@ -2,9 +2,9 @@
 #include "MathHelper.h"
 #include "UploadBuffer.h"
 
-//#define DescriptorTable
+#define DescriptorTable
 //#define RootDescriptor
-#define RootConstant
+//#define RootConstant
 
 
 using Microsoft::WRL::ComPtr;
@@ -13,6 +13,8 @@ using namespace DirectX::PackedVector;
 
 
 XMMATRIX LookatLH(FXMVECTOR, FXMVECTOR, FXMVECTOR);
+XMMATRIX PerspectiveFovLH(float FovAngleY, float AspectRatio, float NearZ, float FarZ);
+
 
 struct Vertex
 {
@@ -148,7 +150,8 @@ void BoxApp::OnResize()
 	D3DApp::OnResize();
 
 	XMMATRIX P = XMMatrixPerspectiveFovLH(0.25f * MathHelper::Pi, AspectRatio(), 1.0f, 1000.0f);
-	XMStoreFloat4x4(&mProj, P);
+	XMMATRIX Q = PerspectiveFovLH(0.25f * MathHelper::Pi, AspectRatio(), 1.0f, 1000.0f);
+	XMStoreFloat4x4(&mProj, Q);
 }
 
 void BoxApp::Update(const GameTimer& gt)
@@ -528,5 +531,25 @@ XMMATRIX LookatLH(FXMVECTOR EyePosition, FXMVECTOR FocusPosition, FXMVECTOR UpDi
 	r1 = XMMatrixTranspose(r1);
 
 	return t1 * r1;
+}
 
+XMMATRIX PerspectiveFovLH(float FovAngleY, float AspectRatio, float NearZ, float FarZ)
+{
+	float sinFov;
+	float cosFov;
+
+	XMScalarSinCos(&sinFov, &cosFov, FovAngleY * 0.5f);
+
+	float Height = cosFov / sinFov;
+	float Width = Height / AspectRatio;
+	float fRange = FarZ / (FarZ - NearZ);
+	
+	XMMATRIX M;
+	M.r[0] = { Width, 0, 0, 0 };
+	M.r[1] = { 0, Height, 0, 0 };
+	M.r[2] = { 0, 0, fRange, 1 };
+	M.r[3] = { 0, 0, fRange * (-NearZ), 0 };
+
+
+	return M;
 }
