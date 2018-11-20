@@ -21,7 +21,7 @@
 #include "LightingUtil.hlsl"
 
 Texture2D    gDiffuseMap			: register(t0);
-
+Texture2D    gDiffuseMap2			: register(t1);
 SamplerState gsamPointWrap			: register(s0);
 SamplerState gsamPointClamp			: register(s1);
 SamplerState gsamLinearWrap			: register(s2);
@@ -86,6 +86,23 @@ struct VertexOut
 	float2 TexC    : TEXCOORD;
 };
 
+float2 rotateUVs(in float2 Texcoords, in float2 Center, float theta)
+{
+	float2 sc;
+	sincos(theta, sc.x, sc.y);
+
+	float2 uv = Texcoords - Center;
+
+	float2 rotateduv;
+
+	rotateduv.x = dot(uv, float2(sc.y, -sc.x));
+	rotateduv.y = dot(uv, sc.xy);
+
+	rotateduv += Center;
+
+	return rotateduv;
+}
+
 VertexOut VS(VertexIn vin)
 {
 	VertexOut vout = (VertexOut)0.0f;
@@ -104,20 +121,22 @@ VertexOut VS(VertexIn vin)
     float4 texC = mul(float4(vin.TexC, 0.0f, 1.0f), gTexTransform);
     vout.TexC = mul(texC, gMatTransform).xy;
 
+	vout.TexC = rotateUVs(vout.TexC, float2(0.5f, 0.5f), gTotalTime * 1.5f);
+
     return vout;
 }
 
 float4 PS(VertexOut pin) : SV_Target
 {
     float4 diffuseAlbedo = gDiffuseMap.Sample(gsamPointWrap, pin.TexC) * gDiffuseAlbedo;
+	float4 diffuseAlbedo1 = gDiffuseMap2.Sample(gsamPointWrap, pin.TexC) * gDiffuseAlbedo;
 
-    // Interpolating normal can unnormalize it, so renormalize it.
+	diffuseAlbedo = diffuseAlbedo * diffuseAlbedo1;
+
     pin.NormalW = normalize(pin.NormalW);
 
-    // Vector from point being lit to eye. 
     float3 toEyeW = normalize(gEyePosW - pin.PosW);
 
-    // Light terms.
     float4 ambient = gAmbientLight*diffuseAlbedo;
 
     const float shininess = 1.0f - gRoughness;
@@ -128,7 +147,6 @@ float4 PS(VertexOut pin) : SV_Target
 
     float4 litColor = ambient + directLight;
 
-    // Common convention to take alpha from diffuse material.
     litColor.a = diffuseAlbedo.a;
 
     return litColor;

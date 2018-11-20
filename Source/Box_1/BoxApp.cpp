@@ -2,8 +2,8 @@
 #include "MathHelper.h"
 #include "UploadBuffer.h"
 
-#define DescriptorTable
-//#define RootDescriptor
+//#define DescriptorTable
+#define RootDescriptor
 //#define RootConstant
 
 
