@@ -40,6 +40,7 @@ enum class RenderLayer : int
 	Opaque = 0,
 	Transparent,
 	AlphaTested,
+	Screen,
 	Count
 };
 
@@ -68,6 +69,7 @@ private:
 	void UpdateMainPassCB(const GameTimer& gt);
 	void UpdateMaterialCBs(const GameTimer& gt);
 	void UpdateWaves(const GameTimer& gt);
+	void UpdateScreenPassCB(const GameTimer& gt);
 	void AnimateMaterials(const GameTimer& gt);
 
 	void LoadTexture();
@@ -75,6 +77,7 @@ private:
 	void BuildRootSignature();
 	void BuildShadersAndInputLayout();
 	void BuildLandGeometry();
+	void BuildScreen();
 	void BuildWavesGeometryBuffers();
 	void BuildPSOs();
 	void BuildFrameResources();
@@ -115,6 +118,7 @@ private:
 	std::unique_ptr<Waves> mWaves;
 
 	PassConstants mMainPassCB;
+	PassConstants mScreenCB;
 
 	XMFLOAT3 mEyePos = { 0.0f, 0.0f, 0.0f };
 	XMFLOAT4X4 mView = MathHelper::Identity4x4();
@@ -175,6 +179,7 @@ bool BlendApp::Initialize()
 	BuildRootSignature();
 	BuildShadersAndInputLayout();
 	BuildLandGeometry();
+	BuildScreen();
 	BuildWavesGeometryBuffers();
 	BuildMaterials();
 	BuildRenderItems();
@@ -265,6 +270,7 @@ void BlendApp::Update(const GameTimer& gt)
 	}
 
 	UpdateObjectCBs(gt);
+	UpdateScreenPassCB(gt);
 	UpdateMaterialCBs(gt);
 	UpdateMainPassCB(gt);
 	UpdateWaves(gt);
@@ -292,12 +298,15 @@ void BlendApp::Draw(const GameTimer& gt)
 
 	mCommandList->SetGraphicsRootSignature(mRootSignature.Get());
 
+	UINT passCBByte = d3dUtil::CalcConstantBufferByteSize(sizeof(PassConstants));
+
 	auto passCB = mCurrFrameResource->PassCB->Resource();
 	mCommandList->SetGraphicsRootConstantBufferView(2, passCB->GetGPUVirtualAddress());
 
 	ID3D12DescriptorHeap * descriptorHeaps[] = { mSrvHeap.Get() };
 	mCommandList->SetDescriptorHeaps((UINT)std::size(descriptorHeaps), descriptorHeaps);
 
+	mCommandList->OMSetStencilRef(0);
 	DrawRenderItems(mCommandList.Get(), mRitemLayer[(int)RenderLayer::Opaque]);
 
 	mCommandList->SetPipelineState(mPSOs["alphaTested"].Get());
@@ -305,6 +314,21 @@ void BlendApp::Draw(const GameTimer& gt)
 
 	mCommandList->SetPipelineState(mPSOs["transparent"].Get());
 	DrawRenderItems(mCommandList.Get(), mRitemLayer[(int)RenderLayer::Transparent]);
+
+	mCommandList->SetGraphicsRootConstantBufferView(2, passCB->GetGPUVirtualAddress() + 1 * passCBByte);
+
+	mCommandList->OMSetStencilRef(1);
+	mCommandList->SetPipelineState(mPSOs["screen"].Get());
+	mRitemLayer[(int)RenderLayer::Screen][0]->Mat = mMaterials["screen"].get();
+	DrawRenderItems(mCommandList.Get(), mRitemLayer[(int)RenderLayer::Screen]);
+
+	mCommandList->OMSetStencilRef(2);
+	mRitemLayer[(int)RenderLayer::Screen][0]->Mat = mMaterials["screen1"].get();
+	DrawRenderItems(mCommandList.Get(), mRitemLayer[(int)RenderLayer::Screen]);
+
+	mCommandList->OMSetStencilRef(3);
+	mRitemLayer[(int)RenderLayer::Screen][0]->Mat = mMaterials["screen2"].get();
+	DrawRenderItems(mCommandList.Get(), mRitemLayer[(int)RenderLayer::Screen]);
 
 	mCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(CurrentBackBuffer(),
 		D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
@@ -392,7 +416,7 @@ void BlendApp::UpdateObjectCBs(const GameTimer& gt)
 			ObjectConstants objConstants;
 			XMStoreFloat4x4(&objConstants.World, XMMatrixTranspose(world));
 			XMStoreFloat4x4(&objConstants.TexTransform, XMMatrixTranspose(texTransform));
-
+			
 			currObjectCB->CopyData(e->ObjCbIndex, objConstants);
 
 			e->NumFramesDirty--;
@@ -494,6 +518,36 @@ void BlendApp::UpdateWaves(const GameTimer& gt)
 	mWavesRitem->Geo->VertexBufferGPU = mCurrFrameResource->WavesVB.get()->Resource();
 }
 
+void BlendApp::UpdateScreenPassCB(const GameTimer& gt)
+{
+	XMMATRIX view = XMMatrixIdentity();
+	XMMATRIX proj = XMMatrixIdentity();
+
+	XMMATRIX viewProj = XMMatrixMultiply(view, proj);
+	XMMATRIX invView = XMMatrixInverse(&XMMatrixDeterminant(view), view);
+	XMMATRIX invProj = XMMatrixInverse(&XMMatrixDeterminant(proj), proj);
+	XMMATRIX invViewProj = XMMatrixInverse(&XMMatrixDeterminant(viewProj), viewProj);
+
+	XMStoreFloat4x4(&mMainPassCB.View, XMMatrixTranspose(view));
+	XMStoreFloat4x4(&mMainPassCB.InvView, XMMatrixTranspose(invView));
+	XMStoreFloat4x4(&mMainPassCB.Proj, XMMatrixTranspose(proj));
+	XMStoreFloat4x4(&mMainPassCB.InvProj, XMMatrixTranspose(invProj));
+	XMStoreFloat4x4(&mMainPassCB.ViewProj, XMMatrixTranspose(viewProj));
+	XMStoreFloat4x4(&mMainPassCB.InvViewProj, XMMatrixTranspose(invViewProj));
+	mMainPassCB.EyePosW = mEyePos;
+	mMainPassCB.RenderTargetSize = XMFLOAT2((float)mClientWidth, (float)mClientHeight);
+	mMainPassCB.InvRenderTargetSize = XMFLOAT2(1.0f / mClientWidth, 1.0f / mClientHeight);
+	mMainPassCB.NearZ = 1.0f;
+	mMainPassCB.FarZ = 1000.0f;
+	mMainPassCB.TotalTime = gt.TotalTime();
+	mMainPassCB.DeltaTime = gt.DeltaTime();
+
+	auto currPassCB = mCurrFrameResource->PassCB.get();
+	currPassCB->CopyData(1, mMainPassCB);
+
+	
+}
+
 void BlendApp::AnimateMaterials(const GameTimer& gt)
 {
 	auto waterMat = mMaterials["water"].get();
@@ -572,6 +626,8 @@ void BlendApp::BuildShadersAndInputLayout()
 	mShaders["standardVS"] = d3dUtil::CompileShader(L"Default.hlsl", nullptr, "VS", "vs_5_0");
 	mShaders["opaquePS"] = d3dUtil::CompileShader(L"Default.hlsl", defines, "PS", "ps_5_0");
 	mShaders["alphaTestedPS"] = d3dUtil::CompileShader(L"Default.hlsl", alphaTestDefines, "PS", "ps_5_0");
+	mShaders["screenVS"] = d3dUtil::CompileShader(L"Default.hlsl", nullptr, "S_VS", "vs_5_0");
+	mShaders["screenPS"] = d3dUtil::CompileShader(L"Default.hlsl", nullptr, "S_PS", "ps_5_0");
 
 	mInputLayout =
 	{
@@ -673,6 +729,82 @@ void BlendApp::BuildLandGeometry()
 	mGeometries["boxGeo"] = std::move(boX);
 }
 
+void BlendApp::BuildScreen()
+{
+	std::array<Vertex, 4> vertices =
+	{
+		Vertex(-1.0f, -1.0f, +0.0f, 0.0f ,0.0f ,0.0f ,0.0f ,0.0f),
+		Vertex(-1.0f, +1.0f, +0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f),
+		Vertex(+1.0f, +1.0f, +0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f),
+		Vertex(+1.0f, -1.0f, +0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f)
+	};
+
+	std::array<std::uint16_t, 6> indicies =
+	{
+		0, 1, 2,
+		0, 2, 3
+	};
+
+	const UINT vbByteSize = (UINT)vertices.size() * sizeof(Vertex);
+	const UINT ibByteSize = (UINT)indicies.size() * sizeof(std::uint16_t);
+
+	auto geo = std::make_unique<MeshGeometry>();
+
+	ThrowIfFailed(D3DCreateBlob(vbByteSize, geo->VertexBufferCPU.GetAddressOf()));
+	ThrowIfFailed(D3DCreateBlob(ibByteSize, geo->IndexBufferCPU.GetAddressOf()));
+	CopyMemory(geo->VertexBufferCPU->GetBufferPointer(), vertices.data(), vbByteSize);
+	CopyMemory(geo->IndexBufferCPU->GetBufferPointer(), indicies.data(), ibByteSize);
+
+	geo->Name = "screenGeo";
+
+	geo->VertexBufferGPU = d3dUtil::CreateDefaultBuffer(md3dDevice.Get(),
+		mCommandList.Get(), vertices.data(), vbByteSize, geo->VertexBufferUploader);
+
+	geo->IndexBufferGPU= d3dUtil::CreateDefaultBuffer(md3dDevice.Get(),
+		mCommandList.Get(), indicies.data(), ibByteSize, geo->IndexBufferUploader);
+
+	geo->VertexByteStride = sizeof(Vertex);
+	geo->VertexBufferByteSize = vbByteSize;
+	geo->IndexFormat = DXGI_FORMAT_R16_UINT;
+	geo->IndexBufferByteSize = ibByteSize;
+
+	SubmeshGeometry submesh;
+	submesh.IndexCount = (UINT)indicies.size();
+	submesh.StartIndexLocation = 0;
+	submesh.BaseVertexLocation = 0;
+
+	geo->DrawArgs["screen"] = submesh;
+
+	auto screen = std::make_unique<Material>();
+	screen->Name = "screen";
+	screen->MatCBIndex = 3;
+	screen->DiffuseSrvHeapIndex = 0;
+	XMStoreFloat4(&screen->DiffuseAlbedo, Colors::DodgerBlue);
+	screen->FresnelR0 = XMFLOAT3(0.1f, 0.1f, 0.1f);
+	screen->Roughness = 0.0f;
+
+	auto screen1 = std::make_unique<Material>();
+	screen1->Name = "screen1";
+	screen1->MatCBIndex = 4;
+	screen1->DiffuseSrvHeapIndex = 0;
+	XMStoreFloat4(&screen1->DiffuseAlbedo, Colors::OrangeRed);
+	screen1->FresnelR0 = XMFLOAT3(0.1f, 0.1f, 0.1f);
+	screen1->Roughness = 0.0f;
+
+	auto screen2 = std::make_unique<Material>();
+	screen2->Name = "screen2";
+	screen2->MatCBIndex = 5;
+	screen2->DiffuseSrvHeapIndex = 0;
+	XMStoreFloat4(&screen2->DiffuseAlbedo, Colors::LawnGreen);
+	screen2->FresnelR0 = XMFLOAT3(0.1f, 0.1f, 0.1f);
+	screen2->Roughness = 0.0f;
+
+	mGeometries[geo->Name] = std::move(geo);
+	mMaterials[screen->Name] = std::move(screen);
+	mMaterials[screen1->Name] = std::move(screen1);
+	mMaterials[screen2->Name] = std::move(screen2);
+}
+
 void BlendApp::BuildWavesGeometryBuffers()
 {
 	std::vector<std::uint16_t> indices(3 * mWaves->TriangleCount()); // 3 indices per face
@@ -749,6 +881,17 @@ void BlendApp::BuildPSOs()
 	opaquePsoDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
 	opaquePsoDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
 	opaquePsoDesc.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
+
+	opaquePsoDesc.DepthStencilState.StencilEnable = true;
+
+	opaquePsoDesc.DepthStencilState.FrontFace.StencilPassOp = D3D12_STENCIL_OP_KEEP;
+	opaquePsoDesc.DepthStencilState.FrontFace.StencilFailOp = D3D12_STENCIL_OP_KEEP;
+	opaquePsoDesc.DepthStencilState.FrontFace.StencilDepthFailOp = D3D12_STENCIL_OP_INCR;
+
+	opaquePsoDesc.DepthStencilState.BackFace.StencilDepthFailOp = D3D12_STENCIL_OP_INCR;
+	opaquePsoDesc.DepthStencilState.BackFace.StencilPassOp = D3D12_STENCIL_OP_KEEP;
+	opaquePsoDesc.DepthStencilState.BackFace.StencilFailOp = D3D12_STENCIL_OP_KEEP;
+
 	opaquePsoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
 	opaquePsoDesc.NumRenderTargets = 1;
 	opaquePsoDesc.SampleMask = UINT_MAX;
@@ -783,6 +926,36 @@ void BlendApp::BuildPSOs()
 	};
 	alphaTestedPsoDesc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
 	ThrowIfFailed(md3dDevice->CreateGraphicsPipelineState(&alphaTestedPsoDesc, IID_PPV_ARGS(mPSOs["alphaTested"].GetAddressOf())));
+
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC screenPsoDesc = opaquePsoDesc;
+	screenPsoDesc.VS =
+	{
+		reinterpret_cast<BYTE*>(mShaders["screenVS"]->GetBufferPointer()),
+		mShaders["screenVS"]->GetBufferSize()
+	};
+	screenPsoDesc.PS =
+	{
+		reinterpret_cast<BYTE*>(mShaders["screenPS"]->GetBufferPointer()),
+		mShaders["screenPS"]->GetBufferSize()
+	};
+	screenPsoDesc.DepthStencilState.DepthEnable = false;
+	screenPsoDesc.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO;
+
+	screenPsoDesc.DepthStencilState.StencilEnable = true;
+	screenPsoDesc.DepthStencilState.StencilReadMask = 0xff;
+	screenPsoDesc.DepthStencilState.StencilWriteMask = 0xff;
+
+	screenPsoDesc.DepthStencilState.FrontFace.StencilFunc = D3D12_COMPARISON_FUNC_EQUAL;
+	screenPsoDesc.DepthStencilState.FrontFace.StencilDepthFailOp = D3D12_STENCIL_OP_KEEP;
+	screenPsoDesc.DepthStencilState.FrontFace.StencilPassOp = D3D12_STENCIL_OP_KEEP;
+	screenPsoDesc.DepthStencilState.FrontFace.StencilFailOp = D3D12_STENCIL_OP_KEEP;
+
+	screenPsoDesc.DepthStencilState.BackFace.StencilFunc = D3D12_COMPARISON_FUNC_NEVER;
+	screenPsoDesc.DepthStencilState.BackFace.StencilDepthFailOp = D3D12_STENCIL_OP_KEEP;
+	screenPsoDesc.DepthStencilState.BackFace.StencilPassOp = D3D12_STENCIL_OP_KEEP;
+	screenPsoDesc.DepthStencilState.BackFace.StencilFailOp = D3D12_STENCIL_OP_KEEP;
+
+	ThrowIfFailed(md3dDevice->CreateGraphicsPipelineState(&screenPsoDesc, IID_PPV_ARGS(mPSOs["screen"].GetAddressOf())));
 }
 
 void BlendApp::BuildFrameResources()
@@ -790,7 +963,7 @@ void BlendApp::BuildFrameResources()
 	for (int i = 0; i < gNumFrameResources; ++i)
 	{
 		mFrameResources.push_back(std::make_unique<FrameResource>(md3dDevice.Get(),
-			1, (UINT)mAllRitems.size(), (UINT)mMaterials.size(), mWaves->VertexCount()));
+			2, (UINT)mAllRitems.size(), (UINT)mMaterials.size(), mWaves->VertexCount()));
 	}
 }
 
@@ -867,9 +1040,21 @@ void BlendApp::BuildRenderItems()
 
 	mRitemLayer[(int)RenderLayer::AlphaTested].push_back(boxRitem.get());
 
+	auto screenRitem = std::make_unique<RenderItem>();
+	screenRitem->ObjCbIndex = 3;
+	screenRitem->Mat = mMaterials["screen"].get();
+	screenRitem->Geo = mGeometries["screenGeo"].get();
+	screenRitem->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+	screenRitem->IndexCount = screenRitem->Geo->DrawArgs["screen"].IndexCount;
+	screenRitem->StartIndexLocation = screenRitem->Geo->DrawArgs["screen"].StartIndexLocation;
+	screenRitem->BaseVertexLocation = screenRitem->Geo->DrawArgs["screen"].BaseVertexLocation;
+	
+	mRitemLayer[(int)RenderLayer::Screen].push_back(screenRitem.get());
+
 	mAllRitems.push_back(std::move(wavesRitem));
 	mAllRitems.push_back(std::move(gridRitem));
 	mAllRitems.push_back(std::move(boxRitem));
+	mAllRitems.push_back(std::move(screenRitem));
 }
 
 void BlendApp::DrawRenderItems(ID3D12GraphicsCommandList* cmdList, const std::vector<RenderItem*>& ritems)
@@ -883,6 +1068,7 @@ void BlendApp::DrawRenderItems(ID3D12GraphicsCommandList* cmdList, const std::ve
 	for (size_t i = 0; i < ritems.size(); ++i)
 	{
 		auto ri = ritems[i];
+
 		cmdList->IASetVertexBuffers(0, 1, &ri->Geo->VertexBufferView());
 		cmdList->IASetIndexBuffer(&ri->Geo->IndexBufferView());
 		cmdList->IASetPrimitiveTopology(ri->PrimitiveType);
