@@ -152,6 +152,9 @@ void VecAddCSApp::DoComputeWork()
 
 	mCommandList->SetComputeRootSignature(mRootSignature.Get());
 
+	ID3D12DescriptorHeap * descriptorHeaps[] = { mCbvSrvUavHeap.Get() };
+	mCommandList->SetDescriptorHeaps((UINT)std::size(descriptorHeaps), descriptorHeaps);
+
 	CD3DX12_GPU_DESCRIPTOR_HANDLE heapHandle(mCbvSrvUavHeap->GetGPUDescriptorHandleForHeapStart());
 
 	mCommandList->SetComputeRootDescriptorTable(0, heapHandle);
