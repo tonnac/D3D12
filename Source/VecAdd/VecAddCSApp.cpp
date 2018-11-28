@@ -126,7 +126,7 @@ void VecAddCSApp::BuildDescriptorHeap()
 {
 	D3D12_DESCRIPTOR_HEAP_DESC heapDesc = {};
 	heapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-	heapDesc.NumDescriptors = 1;
+	heapDesc.NumDescriptors = 3;
 	heapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 
 	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
@@ -140,7 +140,24 @@ void VecAddCSApp::BuildDescriptorHeap()
 
 	ThrowIfFailed(md3dDevice->CreateDescriptorHeap(&heapDesc, IID_PPV_ARGS(mCbvSrvUavHeap.GetAddressOf())));
 
-	md3dDevice->CreateShaderResourceView(mInputBufferA.Get(), &srvDesc, mCbvSrvUavHeap->GetCPUDescriptorHandleForHeapStart());
+	CD3DX12_CPU_DESCRIPTOR_HANDLE handle(mCbvSrvUavHeap->GetCPUDescriptorHandleForHeapStart());
+	md3dDevice->CreateShaderResourceView(mInputBufferA.Get(), &srvDesc, handle);
+
+	handle.Offset(1, mCbvSrvUavDescriptorSize);
+
+	md3dDevice->CreateShaderResourceView(mInputBufferB.Get(), &srvDesc, handle);
+
+	handle.Offset(1, mCbvSrvUavDescriptorSize);
+	
+	D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
+	uavDesc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
+	uavDesc.Format = mReadBackBuffer->GetDesc().Format;
+	uavDesc.Buffer.FirstElement = 0;
+	uavDesc.Buffer.NumElements = 32;
+	uavDesc.Buffer.StructureByteStride = sizeof(Data);
+	uavDesc.Buffer.CounterOffsetInBytes = 0;
+	uavDesc.Buffer.Flags = D3D12_BUFFER_UAV_FLAG_NONE;
+	md3dDevice->CreateUnorderedAccessView(mOutputBuffer.Get(), nullptr, &uavDesc, handle);
 }
 
 
@@ -158,9 +175,13 @@ void VecAddCSApp::DoComputeWork()
 	CD3DX12_GPU_DESCRIPTOR_HANDLE heapHandle(mCbvSrvUavHeap->GetGPUDescriptorHandleForHeapStart());
 
 	mCommandList->SetComputeRootDescriptorTable(0, heapHandle);
+	heapHandle.Offset(1, mCbvSrvUavDescriptorSize);
+	mCommandList->SetComputeRootDescriptorTable(1, heapHandle);
+	heapHandle.Offset(1, mCbvSrvUavDescriptorSize);
+	mCommandList->SetComputeRootDescriptorTable(2, heapHandle);
 //	mCommandList->SetComputeRootShaderResourceView(0, mInputBufferA->GetGPUVirtualAddress());
-	mCommandList->SetComputeRootShaderResourceView(1, mInputBufferB->GetGPUVirtualAddress());
-	mCommandList->SetComputeRootUnorderedAccessView(2, mOutputBuffer->GetGPUVirtualAddress());
+//	mCommandList->SetComputeRootShaderResourceView(1, mInputBufferB->GetGPUVirtualAddress());
+//	mCommandList->SetComputeRootUnorderedAccessView(2, mOutputBuffer->GetGPUVirtualAddress());
 
 	mCommandList->Dispatch(1, 1, 1);
 
@@ -200,10 +221,14 @@ void VecAddCSApp::BuildRootSignature()
 	CD3DX12_ROOT_PARAMETER slotRootParameter[3];
 	CD3DX12_DESCRIPTOR_RANGE srvTable;
 	srvTable.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0);
+	CD3DX12_DESCRIPTOR_RANGE srvTable1;
+	srvTable1.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 1);
+	CD3DX12_DESCRIPTOR_RANGE srvTable2;
+	srvTable2.Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 0);
 
 	slotRootParameter[0].InitAsDescriptorTable(1, &srvTable);
-	slotRootParameter[1].InitAsShaderResourceView(1);
-	slotRootParameter[2].InitAsUnorderedAccessView(0);
+	slotRootParameter[1].InitAsDescriptorTable(1, &srvTable1);
+	slotRootParameter[2].InitAsDescriptorTable(1, &srvTable2);
 
 	CD3DX12_ROOT_SIGNATURE_DESC rootSigDesc(3, slotRootParameter);
 
