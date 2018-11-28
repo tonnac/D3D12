@@ -10,7 +10,6 @@ using namespace DirectX::PackedVector;
 struct Data
 {
 	XMFLOAT3 v1;
-	XMFLOAT2 v2;
 };
 
 class VecAddCSApp : public D3DApp
@@ -43,7 +42,7 @@ private:
 
 private:
 
-	const int NumDataElements = 32;
+	const int NumDataElements = 64;
 
 	UINT mCbvSrvDescriptorSize = 0;
 
@@ -126,7 +125,7 @@ void VecAddCSApp::BuildDescriptorHeap()
 {
 	D3D12_DESCRIPTOR_HEAP_DESC heapDesc = {};
 	heapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-	heapDesc.NumDescriptors = 3;
+	heapDesc.NumDescriptors = 2;
 	heapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 
 	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
@@ -135,7 +134,7 @@ void VecAddCSApp::BuildDescriptorHeap()
 	srvDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
 	srvDesc.Buffer.FirstElement = 0;
 	srvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
-	srvDesc.Buffer.NumElements = 32;
+	srvDesc.Buffer.NumElements = NumDataElements;
 	srvDesc.Buffer.StructureByteStride = sizeof(Data);
 
 	ThrowIfFailed(md3dDevice->CreateDescriptorHeap(&heapDesc, IID_PPV_ARGS(mCbvSrvUavHeap.GetAddressOf())));
@@ -144,17 +143,13 @@ void VecAddCSApp::BuildDescriptorHeap()
 	md3dDevice->CreateShaderResourceView(mInputBufferA.Get(), &srvDesc, handle);
 
 	handle.Offset(1, mCbvSrvUavDescriptorSize);
-
-	md3dDevice->CreateShaderResourceView(mInputBufferB.Get(), &srvDesc, handle);
-
-	handle.Offset(1, mCbvSrvUavDescriptorSize);
 	
 	D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
 	uavDesc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
 	uavDesc.Format = mReadBackBuffer->GetDesc().Format;
 	uavDesc.Buffer.FirstElement = 0;
-	uavDesc.Buffer.NumElements = 32;
-	uavDesc.Buffer.StructureByteStride = sizeof(Data);
+	uavDesc.Buffer.NumElements = NumDataElements;
+	uavDesc.Buffer.StructureByteStride = sizeof(float);
 	uavDesc.Buffer.CounterOffsetInBytes = 0;
 	uavDesc.Buffer.Flags = D3D12_BUFFER_UAV_FLAG_NONE;
 	md3dDevice->CreateUnorderedAccessView(mOutputBuffer.Get(), nullptr, &uavDesc, handle);
@@ -175,19 +170,8 @@ void VecAddCSApp::DoComputeWork()
 	CD3DX12_GPU_DESCRIPTOR_HANDLE heapHandle(mCbvSrvUavHeap->GetGPUDescriptorHandleForHeapStart());
 
 	mCommandList->SetComputeRootDescriptorTable(0, heapHandle);
-	//heapHandle.Offset(1, mCbvSrvUavDescriptorSize);
-	//mCommandList->SetComputeRootDescriptorTable(0, heapHandle);
 
-	//heapHandle.Offset(1, mCbvSrvUavDescriptorSize);
-	//mCommandList->SetComputeRootDescriptorTable(1, heapHandle);
-	//heapHandle.Offset(1, mCbvSrvUavDescriptorSize);
-	//mCommandList->SetComputeRootDescriptorTable(2, heapHandle);
-
-//	mCommandList->SetComputeRootShaderResourceView(0, mInputBufferA->GetGPUVirtualAddress());
-//	mCommandList->SetComputeRootShaderResourceView(1, mInputBufferB->GetGPUVirtualAddress());
-//	mCommandList->SetComputeRootUnorderedAccessView(2, mOutputBuffer->GetGPUVirtualAddress());
-
-	mCommandList->Dispatch(1, 1, 1);
+	mCommandList->Dispatch(2, 1, 1);
 
 	mCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(mOutputBuffer.Get(),
 		D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COPY_SOURCE));
@@ -204,15 +188,14 @@ void VecAddCSApp::DoComputeWork()
 
 	FlushCommandQueue();
 
-	Data* mappedData = nullptr;
+	float* mappedData = nullptr;
 	ThrowIfFailed(mReadBackBuffer->Map(0, nullptr, reinterpret_cast<void**>(&mappedData)));
 
 	std::ofstream fout("results.txt");
 
 	for (int i = 0; i < NumDataElements; ++i)
 	{
-		fout << "(" << mappedData[i].v1.x << ", " << mappedData[i].v1.y << ", " << mappedData[i].v1.z <<
-			", " << mappedData[i].v2.x << ", " << mappedData[i].v2.y << ")" << std::endl;
+		fout << "[" << i << "]: " << mappedData[i] << std::endl;
 	}
 
 	mReadBackBuffer->Unmap(0, nullptr);
@@ -224,7 +207,7 @@ void VecAddCSApp::BuildRootSignature()
 {
 	CD3DX12_ROOT_PARAMETER slotRootParameter[1];
 	CD3DX12_DESCRIPTOR_RANGE Table[2];
-	Table[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 2, 0);
+	Table[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0);
 	Table[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 0);
 	//CD3DX12_DESCRIPTOR_RANGE uavTable;
 	//srvTable1.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 1);
@@ -275,15 +258,18 @@ void VecAddCSApp::BuildPSOs()
 void VecAddCSApp::BuildBuffers()
 {
 	std::vector<Data> dataA(NumDataElements);
-	std::vector<Data> dataB(NumDataElements);
 	for (int i = 0; i < NumDataElements; ++i)
 	{
-		dataA[i].v1 = XMFLOAT3(i, i, i);
-		dataA[i].v2 = XMFLOAT2(i, 0);
-
-		dataB[i].v1 = XMFLOAT3(-i, i, 0.0f);
-		dataB[i].v2 = XMFLOAT2(0, -i);
+		dataA[i].v1 = XMFLOAT3(MathHelper::RandF(0,9), MathHelper::RandF(0,9), MathHelper::RandF(0,9));
+		XMFLOAT2 Length;
+		XMStoreFloat2(&Length, XMVector3Length(XMLoadFloat3(&dataA[i].v1)));
+		while (Length.x > 10.0f)
+		{
+			dataA[i].v1 = XMFLOAT3(MathHelper::RandF(0, 9), MathHelper::RandF(0, 9), MathHelper::RandF(0, 9));
+			XMStoreFloat2(&Length, XMVector3Length(XMLoadFloat3(&dataA[i].v1)));
+		}
 	}
+
 
 	UINT64 byteSize = (UINT64)dataA.size() * sizeof(Data);
 
@@ -291,20 +277,15 @@ void VecAddCSApp::BuildBuffers()
 		md3dDevice.Get(),
 		mCommandList.Get(),
 		dataA.data(),
-		byteSize,
+		(UINT)byteSize,
 		mInputUploadBufferA);
 
-	mInputBufferB = d3dUtil::CreateDefaultBuffer(
-		md3dDevice.Get(),
-		mCommandList.Get(),
-		dataB.data(),
-		byteSize,
-		mInputUploadBufferB);
+	UINT outByteSize = sizeof(float) * (UINT)dataA.size();
 
 	ThrowIfFailed(md3dDevice->CreateCommittedResource(
 		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
 		D3D12_HEAP_FLAG_NONE,
-		&CD3DX12_RESOURCE_DESC::Buffer(byteSize, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS),
+		&CD3DX12_RESOURCE_DESC::Buffer(outByteSize, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS),
 		D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
 		nullptr,
 		IID_PPV_ARGS(&mOutputBuffer)));
@@ -312,7 +293,7 @@ void VecAddCSApp::BuildBuffers()
 	ThrowIfFailed(md3dDevice->CreateCommittedResource(
 		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_READBACK),
 		D3D12_HEAP_FLAG_NONE,
-		&CD3DX12_RESOURCE_DESC::Buffer(byteSize),
+		&CD3DX12_RESOURCE_DESC::Buffer(outByteSize),
 		D3D12_RESOURCE_STATE_COPY_DEST,
 		nullptr,
 		IID_PPV_ARGS(&mReadBackBuffer)));
