@@ -100,7 +100,7 @@ protected:
 	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> mRtvHeap;
 	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> mDsvHeap;
 
-	D3D12_VIEWPORT mScreenViewPort;
+	D3D12_VIEWPORT mScreenViewport;
 	D3D12_RECT	   mScissorRect;
 
 	static const int SwapChainBufferCount = 2;

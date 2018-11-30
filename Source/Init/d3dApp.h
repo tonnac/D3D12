@@ -68,7 +68,7 @@ protected:
 	ComPtr<ID3D12CommandAllocator> mDirectCmdListAlloc;
 	ComPtr<ID3D12GraphicsCommandList> mCommandList;
 
-	D3D12_VIEWPORT mScreenViewPort;
+	D3D12_VIEWPORT mScreenViewport;
 	D3D12_RECT mScissorRect;
 
 	UINT mRtvDescriptorSize = 0;

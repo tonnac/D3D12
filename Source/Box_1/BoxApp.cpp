@@ -189,7 +189,7 @@ void BoxApp::Draw(const GameTimer& gt)
 	ThrowIfFailed(mCommandList->Reset(mDirectCmdListAlloc.Get(), mPSO.Get()));
 
 	mCommandList->RSSetScissorRects(1, &mScissorRect);
-	mCommandList->RSSetViewports(1, &mScreenViewPort);
+	mCommandList->RSSetViewports(1, &mScreenViewport);
 
 	mCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(CurrentBackBuffer(),
 		D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));

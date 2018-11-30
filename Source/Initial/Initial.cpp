@@ -78,7 +78,7 @@ void InitDirect3DApp::Draw(const GameTimer& gt)
 		D3D12_RESOURCE_STATE_RENDER_TARGET));
 
 	mCommandList->RSSetScissorRects(1, &mScissorRect);
-	mCommandList->RSSetViewports(1, &mScreenViewPort);
+	mCommandList->RSSetViewports(1, &mScreenViewport);
 
 	mCommandList->ClearRenderTargetView(
 		CurrentBackBufferView(),
