@@ -84,4 +84,8 @@
       <Filter>소스 파일</Filter>
     </ClCompile>
   </ItemGroup>
+  <ItemGroup>
+    <FxCompile Include="Composite.hlsl" />
+    <FxCompile Include="Sobel.hlsl" />
+  </ItemGroup>
 </Project>
