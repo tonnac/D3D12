@@ -77,6 +77,7 @@ struct SubmeshGeometry
 	INT BaseVertexLocation = 0;
 
 	DirectX::BoundingBox Bounds;
+	DirectX::BoundingSphere Sphere;
 };
 
 struct MeshGeometry
