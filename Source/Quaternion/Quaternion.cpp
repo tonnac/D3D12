@@ -22,5 +22,8 @@ int main()
 
 	bool ppl = XMQuaternionEqual(p2, p1);
 
+	XMFLOAT4 ep;
+	XMStoreFloat4(&ep, XMVectorReciprocal(XMVectorSet(0.1f, 0.2f, 0.3f, 0.4f)));
+
 	return 0;
 }

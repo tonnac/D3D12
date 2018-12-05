@@ -284,6 +284,12 @@ void CameraAndDynamicIndexingApp::OnKeyboardInput(const GameTimer& gt)
 	if (GetAsyncKeyState('D') & 0x8000)
 		mCamera.Strafe(10.0f * dt);
 
+	if (GetAsyncKeyState('Q') & 0x8000)
+		mCamera.Roll(5.0f * dt);
+
+	if (GetAsyncKeyState('E') & 0x8000)
+		mCamera.Roll(-5.0f * dt);
+
 	mCamera.UpdateViewMatrix();
 }
 
@@ -379,13 +385,6 @@ void CameraAndDynamicIndexingApp::UpdateMainPassCB(const GameTimer& gt)
 
 void CameraAndDynamicIndexingApp::LoadTextures()
 {
-	auto bricksTex = std::make_unique<Texture>();
-	bricksTex->Name = "bricksTex";
-	bricksTex->Filename = L"../../Textures/bricks.dds";
-	ThrowIfFailed(DirectX::CreateDDSTextureFromFile12(md3dDevice.Get(),
-		mCommandList.Get(), bricksTex->Filename.c_str(),
-		bricksTex->Resource, bricksTex->UploadHeap));
-
 	auto tileTex = std::make_unique<Texture>();
 	tileTex->Name = "tileTex";
 	tileTex->Filename = L"../../Textures/tile.dds";
@@ -393,30 +392,53 @@ void CameraAndDynamicIndexingApp::LoadTextures()
 		mCommandList.Get(), tileTex->Filename.c_str(),
 		tileTex->Resource, tileTex->UploadHeap));
 
-	auto stoneTex = std::make_unique<Texture>();
-	stoneTex->Name = "stoneTex";
-	stoneTex->Filename = L"../../Textures/stone.dds";
+	auto crateTex0 = std::make_unique<Texture>();
+	crateTex0->Name = "crateTex0";
+	crateTex0->Filename = L"../../Textures/WoodCrate01.dds";
 	ThrowIfFailed(DirectX::CreateDDSTextureFromFile12(md3dDevice.Get(),
-		mCommandList.Get(), stoneTex->Filename.c_str(),
-		stoneTex->Resource, stoneTex->UploadHeap));
+		mCommandList.Get(), crateTex0->Filename.c_str(),
+		crateTex0->Resource, crateTex0->UploadHeap));
 
-	auto crateTex = std::make_unique<Texture>();
-	crateTex->Name = "crateTex";
-	crateTex->Filename = L"../../Textures/WoodCrate01.dds";
+	auto crateTex1 = std::make_unique<Texture>();
+	crateTex1->Name = "crateTex1";
+	crateTex1->Filename = L"../../Textures/WoodCrate02.dds";
 	ThrowIfFailed(DirectX::CreateDDSTextureFromFile12(md3dDevice.Get(),
-		mCommandList.Get(), crateTex->Filename.c_str(),
-		crateTex->Resource, crateTex->UploadHeap));
+		mCommandList.Get(), crateTex1->Filename.c_str(),
+		crateTex1->Resource, crateTex1->UploadHeap));
 
-	mTexture[bricksTex->Name] = std::move(bricksTex);
-	mTexture[stoneTex->Name] = std::move(stoneTex);
+	auto crateTex2 = std::make_unique<Texture>();
+	crateTex2->Name = "crateTex2";
+	crateTex2->Filename = L"../../Textures/WireFence.dds";
+	ThrowIfFailed(DirectX::CreateDDSTextureFromFile12(md3dDevice.Get(),
+		mCommandList.Get(), crateTex2->Filename.c_str(),
+		crateTex2->Resource, crateTex2->UploadHeap));
+
+	auto crateTex3 = std::make_unique<Texture>();
+	crateTex3->Name = "crateTex3";
+	crateTex3->Filename = L"../../Textures/bricks3.dds";
+	ThrowIfFailed(DirectX::CreateDDSTextureFromFile12(md3dDevice.Get(),
+		mCommandList.Get(), crateTex3->Filename.c_str(),
+		crateTex3->Resource, crateTex3->UploadHeap));
+
+	auto crateTex4 = std::make_unique<Texture>();
+	crateTex4->Name = "crateTex4";
+	crateTex4->Filename = L"../../Textures/checkboard.dds";
+	ThrowIfFailed(DirectX::CreateDDSTextureFromFile12(md3dDevice.Get(),
+		mCommandList.Get(), crateTex4->Filename.c_str(),
+		crateTex4->Resource, crateTex4->UploadHeap));
+
 	mTexture[tileTex->Name] = std::move(tileTex);
-	mTexture[crateTex->Name] = std::move(crateTex);
+	mTexture[crateTex0->Name] = std::move(crateTex0);
+	mTexture[crateTex1->Name] = std::move(crateTex1);
+	mTexture[crateTex2->Name] = std::move(crateTex2);
+	mTexture[crateTex3->Name] = std::move(crateTex3);
+	mTexture[crateTex4->Name] = std::move(crateTex4);
 }
 
 void CameraAndDynamicIndexingApp::BuildRootSignature()
 {
 	CD3DX12_DESCRIPTOR_RANGE texTable;
-	texTable.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 4, 0, 0);
+	texTable.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, (UINT)mTexture.size(), 0, 0);
 
 	CD3DX12_ROOT_PARAMETER slotRootParameter[4];
 
@@ -455,44 +477,58 @@ void CameraAndDynamicIndexingApp::BuildRootSignature()
 void CameraAndDynamicIndexingApp::BuildDescriptorHeaps()
 {
 	D3D12_DESCRIPTOR_HEAP_DESC srvHeapDesc = {};
-	srvHeapDesc.NumDescriptors = 4;
+	srvHeapDesc.NumDescriptors = 6;
 	srvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 	srvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 	ThrowIfFailed(md3dDevice->CreateDescriptorHeap(&srvHeapDesc, IID_PPV_ARGS(&mSrvDescriptorHeap)));
 
 	CD3DX12_CPU_DESCRIPTOR_HANDLE hDescriptor(mSrvDescriptorHeap->GetCPUDescriptorHandleForHeapStart());
 
-	auto bricksTex = mTexture["bricksTex"]->Resource;
-	auto stoneTex = mTexture["stoneTex"]->Resource;
 	auto tileTex = mTexture["tileTex"]->Resource;
-	auto crateTex = mTexture["crateTex"]->Resource;
+	auto crateTex0 = mTexture["crateTex0"]->Resource;
+	auto crateTex1 = mTexture["crateTex1"]->Resource;
+	auto crateTex2 = mTexture["crateTex2"]->Resource;
+	auto crateTex3 = mTexture["crateTex3"]->Resource;
+	auto crateTex4 = mTexture["crateTex4"]->Resource;
 
 	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
 	srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-	srvDesc.Format = bricksTex->GetDesc().Format;
+	srvDesc.Format = tileTex->GetDesc().Format;
 	srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
 	srvDesc.Texture2D.MostDetailedMip = 0;
-	srvDesc.Texture2D.MipLevels = bricksTex->GetDesc().MipLevels;
-	srvDesc.Texture2D.ResourceMinLODClamp = 0.0f;
-	md3dDevice->CreateShaderResourceView(bricksTex.Get(), &srvDesc, hDescriptor);
-
-	hDescriptor.Offset(1, mCbvSrvUavDescriptorSize);
-
-	srvDesc.Format = stoneTex->GetDesc().Format;
-	srvDesc.Texture2D.MipLevels = stoneTex->GetDesc().MipLevels;
-	md3dDevice->CreateShaderResourceView(stoneTex.Get(), &srvDesc, hDescriptor);
-
-	hDescriptor.Offset(1, mCbvSrvUavDescriptorSize);
-
-	srvDesc.Format = tileTex->GetDesc().Format;
 	srvDesc.Texture2D.MipLevels = tileTex->GetDesc().MipLevels;
+	srvDesc.Texture2D.ResourceMinLODClamp = 0.0f;
 	md3dDevice->CreateShaderResourceView(tileTex.Get(), &srvDesc, hDescriptor);
 
 	hDescriptor.Offset(1, mCbvSrvUavDescriptorSize);
 
-	srvDesc.Format = crateTex->GetDesc().Format;
-	srvDesc.Texture2D.MipLevels = crateTex->GetDesc().MipLevels;
-	md3dDevice->CreateShaderResourceView(crateTex.Get(), &srvDesc, hDescriptor);
+	srvDesc.Format = crateTex0->GetDesc().Format;
+	srvDesc.Texture2D.MipLevels = crateTex0->GetDesc().MipLevels;
+	md3dDevice->CreateShaderResourceView(crateTex0.Get(), &srvDesc, hDescriptor);
+
+	hDescriptor.Offset(1, mCbvSrvUavDescriptorSize);
+
+	srvDesc.Format = crateTex1->GetDesc().Format;
+	srvDesc.Texture2D.MipLevels = crateTex1->GetDesc().MipLevels;
+	md3dDevice->CreateShaderResourceView(crateTex1.Get(), &srvDesc, hDescriptor);
+
+	hDescriptor.Offset(1, mCbvSrvUavDescriptorSize);
+
+	srvDesc.Format = crateTex2->GetDesc().Format;
+	srvDesc.Texture2D.MipLevels = crateTex2->GetDesc().MipLevels;
+	md3dDevice->CreateShaderResourceView(crateTex2.Get(), &srvDesc, hDescriptor);
+
+	hDescriptor.Offset(1, mCbvSrvUavDescriptorSize);
+
+	srvDesc.Format = crateTex3->GetDesc().Format;
+	srvDesc.Texture2D.MipLevels = crateTex3->GetDesc().MipLevels;
+	md3dDevice->CreateShaderResourceView(crateTex3.Get(), &srvDesc, hDescriptor);
+
+	hDescriptor.Offset(1, mCbvSrvUavDescriptorSize);
+
+	srvDesc.Format = crateTex4->GetDesc().Format;
+	srvDesc.Texture2D.MipLevels = crateTex4->GetDesc().MipLevels;
+	md3dDevice->CreateShaderResourceView(crateTex4.Get(), &srvDesc, hDescriptor);
 }
 
 void CameraAndDynamicIndexingApp::BuildShadersAndInputLayout()
@@ -518,18 +554,12 @@ void CameraAndDynamicIndexingApp::BuildShapeGeometry()
 	GeometryGenerator geoGen;
 	GeometryGenerator::MeshData box = geoGen.CreateBox(1.0f, 1.0f, 1.0f, 3);
 	GeometryGenerator::MeshData grid = geoGen.CreateGrid(20.0f, 30.0f, 60, 40);
-	GeometryGenerator::MeshData sphere = geoGen.CreateSphere(0.5f, 20, 20);
-	GeometryGenerator::MeshData cylinder = geoGen.CreateCylinder(0.5f, 0.3f, 3.0f, 20, 20);
 
 	UINT boxVertexOffset = 0;
 	UINT gridVertexOffset = (UINT)box.Vertices.size();
-	UINT sphereVertexOffset = gridVertexOffset + (UINT)grid.Vertices.size();
-	UINT cylinderVertexOffset = sphereVertexOffset + (UINT)sphere.Vertices.size();
-	
+
 	UINT boxIndexOffset = 0;
 	UINT gridIndexOffset = (UINT)box.Indices32.size();
-	UINT sphereIndexOffset = gridIndexOffset + (UINT)grid.Indices32.size();
-	UINT cylinderIndexOffset = sphereIndexOffset + (UINT)sphere.Indices32.size();
 
 	SubmeshGeometry boxSubmesh;
 	boxSubmesh.IndexCount = (UINT)box.Indices32.size();
@@ -541,17 +571,7 @@ void CameraAndDynamicIndexingApp::BuildShapeGeometry()
 	gridSubmesh.StartIndexLocation = gridIndexOffset;
 	gridSubmesh.BaseVertexLocation = gridVertexOffset;
 
-	SubmeshGeometry sphereSubmesh;
-	sphereSubmesh.IndexCount = (UINT)sphere.Indices32.size();
-	sphereSubmesh.StartIndexLocation = sphereIndexOffset;
-	sphereSubmesh.BaseVertexLocation = sphereVertexOffset;
-
-	SubmeshGeometry cylinderSubmesh;
-	cylinderSubmesh.IndexCount = (UINT)cylinder.Indices32.size();
-	cylinderSubmesh.StartIndexLocation = cylinderIndexOffset;
-	cylinderSubmesh.BaseVertexLocation = cylinderVertexOffset;
-
-	auto totalVertexCount = box.Vertices.size() + grid.Vertices.size() + sphere.Vertices.size() + cylinder.Vertices.size();
+	auto totalVertexCount = box.Vertices.size() + grid.Vertices.size();
 
 	std::vector<Vertex> vertices(totalVertexCount);
 
@@ -570,25 +590,10 @@ void CameraAndDynamicIndexingApp::BuildShapeGeometry()
 		vertices[k].TexC = grid.Vertices[i].TexC;
 	}
 
-	for (size_t i = 0; i < sphere.Vertices.size(); ++i, ++k)
-	{
-		vertices[k].Pos = sphere.Vertices[i].Position;
-		vertices[k].Normal = sphere.Vertices[i].Normal;
-		vertices[k].TexC = sphere.Vertices[i].TexC;
-	}
-
-	for (size_t i = 0; i < cylinder.Vertices.size(); ++i, ++k)
-	{
-		vertices[k].Pos = cylinder.Vertices[i].Position;
-		vertices[k].Normal = cylinder.Vertices[i].Normal;
-		vertices[k].TexC = cylinder.Vertices[i].TexC;
-	}
 
 	std::vector<std::uint16_t> indices;
 	indices.insert(indices.end(), std::begin(box.GetIndices16()), std::end(box.GetIndices16()));
 	indices.insert(indices.end(), std::begin(grid.GetIndices16()), std::end(grid.GetIndices16()));
-	indices.insert(indices.end(), std::begin(sphere.GetIndices16()), std::end(sphere.GetIndices16()));
-	indices.insert(indices.end(), std::begin(cylinder.GetIndices16()), std::end(cylinder.GetIndices16()));
 
 	const UINT vbByteSize = (UINT)vertices.size() * sizeof(Vertex);
 	const UINT ibByteSize = (UINT)indices.size() * sizeof(std::uint16_t);
@@ -615,8 +620,6 @@ void CameraAndDynamicIndexingApp::BuildShapeGeometry()
 
 	geo->DrawArgs["box"] = boxSubmesh;
 	geo->DrawArgs["grid"] = gridSubmesh;
-	geo->DrawArgs["sphere"] = sphereSubmesh;
-	geo->DrawArgs["cylinder"] = cylinderSubmesh;
 
 	mGeometries[geo->Name] = std::move(geo);
 
@@ -663,62 +666,70 @@ void CameraAndDynamicIndexingApp::BuildFrameResources()
 
 void CameraAndDynamicIndexingApp::BuildMaterials()
 {
-	auto bricks0 = std::make_unique<Material>();
-	bricks0->Name = "bricks0";
-	bricks0->MatCBIndex = 0;
-	bricks0->DiffuseSrvHeapIndex = 0;
-	bricks0->DiffuseAlbedo = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
-	bricks0->FresnelR0 = XMFLOAT3(0.02f, 0.02f, 0.02f);
-	bricks0->Roughness = 0.1f;
-
-	auto stone0 = std::make_unique<Material>();
-	stone0->Name = "stone0";
-	stone0->MatCBIndex = 1;
-	stone0->DiffuseSrvHeapIndex = 1;
-	stone0->DiffuseAlbedo = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
-	stone0->FresnelR0 = XMFLOAT3(0.05f, 0.05f, 0.05f);
-	stone0->Roughness = 0.3f;
+	auto tileTex = mTexture["tileTex"]->Resource;
 
 	auto tile0 = std::make_unique<Material>();
 	tile0->Name = "tile0";
-	tile0->MatCBIndex = 2;
-	tile0->DiffuseSrvHeapIndex = 2;
+	tile0->MatCBIndex = 0;
+	tile0->DiffuseSrvHeapIndex = 0;
 	tile0->DiffuseAlbedo = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
 	tile0->FresnelR0 = XMFLOAT3(0.02f, 0.02f, 0.02f);
 	tile0->Roughness = 0.3f;
 
-	auto crate0 = std::make_unique<Material>();
-	crate0->Name = "crate0";
-	crate0->MatCBIndex = 3;
-	crate0->DiffuseSrvHeapIndex = 3;
-	crate0->DiffuseAlbedo = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
-	crate0->FresnelR0 = XMFLOAT3(0.05f, 0.05f, 0.05f);
-	crate0->Roughness = 0.2f;
+	auto crateTex0 = std::make_unique<Material>();
+	crateTex0->Name = "crateTex0";
+	crateTex0->MatCBIndex = 1;
+	crateTex0->DiffuseSrvHeapIndex = 1;
+	crateTex0->DiffuseAlbedo = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+	crateTex0->FresnelR0 = XMFLOAT3(0.02f, 0.02f, 0.02f);
+	crateTex0->Roughness = 0.1f;
 
-	mMaterials[bricks0->Name] = std::move(bricks0);
-	mMaterials[stone0->Name] = std::move(stone0);
+	auto crateTex1 = std::make_unique<Material>();
+	crateTex1->Name = "crateTex1";
+	crateTex1->MatCBIndex = 2;
+	crateTex1->DiffuseSrvHeapIndex = 2;
+	crateTex1->DiffuseAlbedo = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+	crateTex1->FresnelR0 = XMFLOAT3(0.02f, 0.02f, 0.02f);
+	crateTex1->Roughness = 0.1f;
+
+	auto crateTex2 = std::make_unique<Material>();
+	crateTex2->Name = "crateTex2";
+	crateTex2->MatCBIndex = 3;
+	crateTex2->DiffuseSrvHeapIndex = 3;
+	crateTex2->DiffuseAlbedo = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+	crateTex2->FresnelR0 = XMFLOAT3(0.02f, 0.02f, 0.02f);
+	crateTex2->Roughness = 0.1f;
+
+	auto crateTex3 = std::make_unique<Material>();
+	crateTex3->Name = "crateTex3";
+	crateTex3->MatCBIndex = 4;
+	crateTex3->DiffuseSrvHeapIndex = 4;
+	crateTex3->DiffuseAlbedo = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+	crateTex3->FresnelR0 = XMFLOAT3(0.02f, 0.02f, 0.02f);
+	crateTex3->Roughness = 0.1f;
+
+	auto crateTex4 = std::make_unique<Material>();
+	crateTex4->Name = "crateTex4";
+	crateTex4->MatCBIndex = 5;
+	crateTex4->DiffuseSrvHeapIndex = 5;
+	crateTex4->DiffuseAlbedo = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+	crateTex4->FresnelR0 = XMFLOAT3(0.02f, 0.02f, 0.02f);
+	crateTex4->Roughness = 0.1f;
+
 	mMaterials[tile0->Name] = std::move(tile0);
-	mMaterials[crate0->Name] = std::move(crate0);
+	mMaterials[crateTex0->Name] = std::move(crateTex0);
+	mMaterials[crateTex1->Name] = std::move(crateTex1);
+	mMaterials[crateTex2->Name] = std::move(crateTex2);
+	mMaterials[crateTex3->Name] = std::move(crateTex3);
+	mMaterials[crateTex4->Name] = std::move(crateTex4);
 }
 
 void CameraAndDynamicIndexingApp::BuildRenderItems()
 {
-	auto boxRitem = std::make_unique<RenderItem>();
-	XMStoreFloat4x4(&boxRitem->World, XMMatrixScaling(2.0f, 2.0f, 2.0f) * XMMatrixTranslation(0.0f, 1.0f, 0.0f));
-	XMStoreFloat4x4(&boxRitem->TexTransform, XMMatrixScaling(1.0f, 1.0f, 1.0f));
-	boxRitem->ObjCbIndex = 0;
-	boxRitem->Geo = mGeometries["shapeGeo"].get();
-	boxRitem->Mat = mMaterials["crate0"].get();
-	boxRitem->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
-	boxRitem->IndexCount = boxRitem->Geo->DrawArgs["box"].IndexCount;
-	boxRitem->StartIndexLocation = boxRitem->Geo->DrawArgs["box"].StartIndexLocation;
-	boxRitem->BaseVertexLocation = boxRitem->Geo->DrawArgs["box"].BaseVertexLocation;
-	mAllRitems.push_back(std::move(boxRitem));
-
 	auto gridRitem = std::make_unique<RenderItem>();
 	gridRitem->World = MathHelper::Identity4x4();
 	XMStoreFloat4x4(&gridRitem->TexTransform, XMMatrixScaling(8.0f, 8.0f, 1.0f));
-	gridRitem->ObjCbIndex = 1;
+	gridRitem->ObjCbIndex = 0;
 	gridRitem->Geo = mGeometries["shapeGeo"].get();
 	gridRitem->Mat = mMaterials["tile0"].get();
 	gridRitem->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
@@ -728,65 +739,24 @@ void CameraAndDynamicIndexingApp::BuildRenderItems()
 	mAllRitems.push_back(std::move(gridRitem));
 
 	XMMATRIX brickTexTransform = XMMatrixScaling(1.0f, 1.0f, 1.0f);
-	UINT objCBIndex = 2;
+	UINT objCBIndex = 1;
+	std::unordered_map<std::string, std::unique_ptr<Material>>::iterator iter;
+	iter = mMaterials.begin();
 	for (int i = 0; i < 5; ++i)
 	{
-		auto leftCylRitem = std::make_unique<RenderItem>();
-		auto rightCylRitem = std::make_unique<RenderItem>();
-		auto leftSphereRitem = std::make_unique<RenderItem>();
-		auto rightSphereRitem = std::make_unique<RenderItem>();
-
-		XMMATRIX leftCylWorld = XMMatrixTranslation(-5.0f, 1.5f, -10.0f + i * 5.0f);
-		XMMATRIX rightCylWorld = XMMatrixTranslation(+5.0f, 1.5f, -10.0f + i * 5.0f);
-
-		XMMATRIX leftSphereWorld = XMMatrixTranslation(-5.0f, 3.5f, -10.0f + i * 5.0f);
-		XMMATRIX rightSphereWorld = XMMatrixTranslation(+5.0f, 3.5f, -10.0f + i * 5.0f);
-
-		XMStoreFloat4x4(&leftCylRitem->World, rightCylWorld);
-		XMStoreFloat4x4(&leftCylRitem->TexTransform, brickTexTransform);
-		leftCylRitem->ObjCbIndex = objCBIndex++;
-		leftCylRitem->Geo = mGeometries["shapeGeo"].get();
-		leftCylRitem->Mat = mMaterials["bricks0"].get();
-		leftCylRitem->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
-		leftCylRitem->IndexCount = leftCylRitem->Geo->DrawArgs["cylinder"].IndexCount;
-		leftCylRitem->StartIndexLocation = leftCylRitem->Geo->DrawArgs["cylinder"].StartIndexLocation;
-		leftCylRitem->BaseVertexLocation = leftCylRitem->Geo->DrawArgs["cylinder"].BaseVertexLocation;
-
-		XMStoreFloat4x4(&rightCylRitem->TexTransform, brickTexTransform);
-		XMStoreFloat4x4(&rightCylRitem->World, leftCylWorld);
-		rightCylRitem->ObjCbIndex = objCBIndex++;
-		rightCylRitem->Geo = mGeometries["shapeGeo"].get();
-		rightCylRitem->Mat = mMaterials["bricks0"].get();
-		rightCylRitem->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
-		rightCylRitem->IndexCount = leftCylRitem->Geo->DrawArgs["cylinder"].IndexCount;
-		rightCylRitem->StartIndexLocation = leftCylRitem->Geo->DrawArgs["cylinder"].StartIndexLocation;
-		rightCylRitem->BaseVertexLocation = leftCylRitem->Geo->DrawArgs["cylinder"].BaseVertexLocation;
-
-		XMStoreFloat4x4(&leftSphereRitem->TexTransform, brickTexTransform);
-		XMStoreFloat4x4(&leftSphereRitem->World, leftSphereWorld);
-		leftSphereRitem->ObjCbIndex = objCBIndex++;
-		leftSphereRitem->Geo = mGeometries["shapeGeo"].get();
-		leftSphereRitem->Mat = mMaterials["stone0"].get();
-		leftSphereRitem->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
-		leftSphereRitem->IndexCount = leftCylRitem->Geo->DrawArgs["sphere"].IndexCount;
-		leftSphereRitem->StartIndexLocation = leftCylRitem->Geo->DrawArgs["sphere"].StartIndexLocation;
-		leftSphereRitem->BaseVertexLocation = leftCylRitem->Geo->DrawArgs["sphere"].BaseVertexLocation;
-
-		XMStoreFloat4x4(&rightSphereRitem->TexTransform, brickTexTransform);
-		XMStoreFloat4x4(&rightSphereRitem->World, rightSphereWorld);
-		rightSphereRitem->ObjCbIndex = objCBIndex++;
-		rightSphereRitem->Geo = mGeometries["shapeGeo"].get();
-		rightSphereRitem->Mat = mMaterials["stone0"].get();
-		rightSphereRitem->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
-		rightSphereRitem->IndexCount = rightSphereRitem->Geo->DrawArgs["sphere"].IndexCount;
-		rightSphereRitem->StartIndexLocation = rightSphereRitem->Geo->DrawArgs["sphere"].StartIndexLocation;
-		rightSphereRitem->BaseVertexLocation = rightSphereRitem->Geo->DrawArgs["sphere"].BaseVertexLocation;
-
-
-		mAllRitems.push_back(std::move(leftCylRitem));
-		mAllRitems.push_back(std::move(rightCylRitem));
-		mAllRitems.push_back(std::move(leftSphereRitem));
-		mAllRitems.push_back(std::move(rightSphereRitem));
+		auto boxRitem = std::make_unique<RenderItem>();
+		XMStoreFloat4x4(&boxRitem->World, XMMatrixScaling(2.0f, 2.0f, 2.0f) * XMMatrixTranslation(MathHelper::RandF(-10.0f, 8.0f), 1.0f, MathHelper::RandF(-5.0f, 8.0f)));
+		XMStoreFloat4x4(&boxRitem->TexTransform, XMMatrixScaling(1.0f, 1.0f, 1.0f));
+		boxRitem->ObjCbIndex = objCBIndex++;
+		boxRitem->Geo = mGeometries["shapeGeo"].get();
+		if (iter->second->Name == "tile0")
+			++iter;
+		boxRitem->Mat = iter++->second.get();
+		boxRitem->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+		boxRitem->IndexCount = boxRitem->Geo->DrawArgs["box"].IndexCount;
+		boxRitem->StartIndexLocation = boxRitem->Geo->DrawArgs["box"].StartIndexLocation;
+		boxRitem->BaseVertexLocation = boxRitem->Geo->DrawArgs["box"].BaseVertexLocation;
+		mAllRitems.push_back(std::move(boxRitem));
 	}
 
 	for (auto&e : mAllRitems)

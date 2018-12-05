@@ -31,7 +31,7 @@ struct MaterialData
 	uint MatPad2;
 };
 
-Texture2D    gDiffuseMap[4]			: register(t0);
+Texture2D    gDiffuseMap[6]			: register(t0);
 
 StructuredBuffer<MaterialData> gMaterialData : register(t0, space1);
 
