@@ -25,5 +25,18 @@ int main()
 	XMFLOAT4 ep;
 	XMStoreFloat4(&ep, XMVectorReciprocal(XMVectorSet(0.1f, 0.2f, 0.3f, 0.4f)));
 
+	XMVECTOR zero = XMVectorZero();
+
+	XMVECTOR one = XMVectorSplatOne();
+	XMVECTOR zero1 = XMVectorZero();
+	XMVECTOR inf = XMVectorSplatInfinity();
+
+	XMVECTOR v1 = XMVectorSet(1.0f, 9.0f, 12.0f, 2.0f);
+	XMVECTOR v2 = XMVectorSet(5.0f, 7.0f, 9.0f, 11.0f);
+
+	XMVECTOR ret = XMVectorGreater(v2, v1);
+
+	XMVECTOR select = XMVectorSelect(v1, v2, v2);
+
 	return 0;
 }
