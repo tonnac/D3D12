@@ -434,7 +434,7 @@ void CubeMapApp::BuildRootSignature()
 	texTable0.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0, 0);
 
 	CD3DX12_DESCRIPTOR_RANGE texTable1;
-	texTable1.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 5, 1, 0);
+	texTable1.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 4, 1, 0);
 
 	CD3DX12_ROOT_PARAMETER slotRootParameter[5];
 
@@ -774,7 +774,8 @@ void CubeMapApp::BuildPSOs()
 
 	auto skyPsoDesc = opaquePsoDesc;
 
-	skyPsoDesc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
+	//skyPsoDesc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
+	skyPsoDesc.RasterizerState.FrontCounterClockwise = true;
 	skyPsoDesc.DepthStencilState.DepthFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL;
 	skyPsoDesc.pRootSignature = mRootSignature.Get();
 	skyPsoDesc.VS =
@@ -821,14 +822,14 @@ void CubeMapApp::BuildMaterials()
 	mirror0->Name = "mirror0";
 	mirror0->MatCBIndex = 2;
 	mirror0->DiffuseSrvHeapIndex = 2;
-	mirror0->DiffuseAlbedo = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
-	mirror0->FresnelR0 = XMFLOAT3(0.05f, 0.05f, 0.05f);
+	mirror0->DiffuseAlbedo = XMFLOAT4(0.0f, 0.0f, 0.1f, 1.0f);
+	mirror0->FresnelR0 = XMFLOAT3(0.98f, 0.97f, 0.95f);
 	mirror0->Roughness = 0.1f;
 
 	auto skullMat = std::make_unique<Material>();
 	skullMat->Name = "skullMat";
 	skullMat->MatCBIndex = 3;
-	skullMat->DiffuseSrvHeapIndex = 3;
+	skullMat->DiffuseSrvHeapIndex = 2;
 	skullMat->DiffuseAlbedo = XMFLOAT4(0.8f, 0.8f, 0.8f, 1.0f);
 	skullMat->FresnelR0 = XMFLOAT3(0.2f, 0.2f, 0.2f);
 	skullMat->Roughness = 0.2f;
@@ -836,7 +837,7 @@ void CubeMapApp::BuildMaterials()
 	auto sky = std::make_unique<Material>();
 	sky->Name = "sky";
 	sky->MatCBIndex = 4;
-	sky->DiffuseSrvHeapIndex = 4;
+	sky->DiffuseSrvHeapIndex = 3;
 	sky->DiffuseAlbedo = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
 	sky->FresnelR0 = XMFLOAT3(0.1f, 0.1f, 0.1f);
 	sky->Roughness = 1.0f;
