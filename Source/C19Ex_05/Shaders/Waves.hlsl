@@ -144,6 +144,21 @@ DomainOut DS(PatchTess patchTess,
 	return dOut;
 }
 
+
+float3 BoxCubeMapLookup(float3 rayOrigin, float3 unitRayDir, float3 boxCenter, float3 boxExtents)
+{
+	float3 p = rayOrigin - boxCenter;
+
+	float3 t1 = (-p + boxExtents) / unitRayDir;
+	float3 t2 = (-p - boxExtents) / unitRayDir;
+
+	float3 tmax = max(t1, t2);
+
+	float t = min(min(tmax.x, tmax.y), tmax.z);
+
+	return p + t * unitRayDir;
+}
+
 float4 PS(DomainOut pin) : SV_Target
 {
 	MaterialData matData = gMaterialData[gMaterialIndex];
@@ -181,11 +196,12 @@ float4 PS(DomainOut pin) : SV_Target
 	float4 litColor = ambient + directLight;
 
 	float3 r = reflect(-toEyeW, bumpedNormalW);
+	float3 reflect = BoxCubeMapLookup(pin.PosW, r, float3(0, 0, 0), float3(5000, 5000, 5000));
 	float3 re = refract(-toEyeW, bumpedNormalW, 1.33f);
-	float4 reflectionColor = gCubeMap.Sample(gsamLinearWrap, r);
+	float4 reflectionColor = gCubeMap.Sample(gsamLinearWrap, reflect);
 	float4 recolor = gCubeMap.Sample(gsamLinearWrap, re);
-	float3 fresnelFactor = SchlickFresnel(fresnelR0, bumpedNormalW, r);
-	litColor.rgb += shininess * fresnelFactor * reflectionColor.rgb * recolor.rgb;
+	float3 fresnelFactor = SchlickFresnel(fresnelR0, bumpedNormalW, reflect);
+	litColor.rgb += shininess * fresnelFactor * reflectionColor.rgb;// *recolor.rgb;
 
 	litColor.a = diffuseAlbedo.a;
 
