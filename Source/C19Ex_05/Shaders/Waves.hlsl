@@ -11,6 +11,7 @@ struct VertexIn
 struct VertexOut
 {
 	float3 PosL : POSITION;
+	float4 PosW : POSITION1;
 	float3 NormalL : NORMAL;
 	float2 TexC : TEXCOORD;
 	float3 TangentU : TANGENT;
@@ -20,6 +21,7 @@ VertexOut VS(in VertexIn vIn)
 {
 	VertexOut vOut = (VertexOut)0.0f;
 	vOut.PosL = vIn.PosL;
+	vOut.PosW = mul(float4(vIn.PosL, 1.0f), gWorld);
 	vOut.NormalL = vIn.NormalL;
 	vOut.TexC = vIn.TexC;
 	vOut.TangentU = vIn.TangentU;
@@ -35,14 +37,23 @@ struct PatchTess
 PatchTess ConstantHS(InputPatch<VertexOut, 4> patch, uint patchID : SV_PrimitiveID)
 {
 	PatchTess pt;
+	
+	float3 Center = (patch[0].PosW + patch[1].PosW + patch[2].PosW + patch[3].PosW).xyz / 4.0f;
 
-	pt.EdgeTess[0] = 64.0f;
-	pt.EdgeTess[1] = 64.0f;
-	pt.EdgeTess[2] = 64.0f;
-	pt.EdgeTess[3] = 64.0f;
+	float d = distance(Center, gEyePosW);
 
-	pt.InsideTess[0] = 64.0f;
-	pt.InsideTess[1] = 64.0f;
+	const float d0 = 20.0f;
+	const float d1 = 100.0f;
+
+	float tess = 64.0f * saturate((d1 - d) / (d1 - d0));
+
+	pt.EdgeTess[0] = tess;
+	pt.EdgeTess[1] = tess;
+	pt.EdgeTess[2] = tess;
+	pt.EdgeTess[3] = tess;
+
+	pt.InsideTess[0] = tess;
+	pt.InsideTess[1] = tess;
 
 	return pt;
 }
@@ -56,7 +67,7 @@ struct HullOut
 };
 
 [domain("quad")]
-[partitioning("integer")]
+[partitioning("fractional_odd")]
 [outputtopology("triangle_cw")]
 [outputcontrolpoints(16)]
 [patchconstantfunc("ConstantHS")]
@@ -88,6 +99,14 @@ HullOut HS(InputPatch<VertexOut, 4> p,
 	float3 v5 = v2 * ratioRow;
 
 	hOut.PosL = p[0].PosL + v4 + v5;
+	if (col == 1)
+	{
+		hOut.PosL.y = 3.0f * cos(gTotalTime);
+	}
+	else if (col == 2)
+	{
+		hOut.PosL.y = -3.0f * sin(gTotalTime);
+	}
 	hOut.TexC = Tex;
 
 	return hOut;
@@ -104,6 +123,39 @@ struct DomainOut
 	float2 t1 : TEXCOORD2;
 };
 
+float4 BernsteinBasis(float t)
+{
+	float invT = 1.0f - t;
+
+	return float4(
+		invT * invT * invT,
+		3.0f * t * invT * invT,
+		3.0f * t * t * invT,
+		t * t * t);
+}
+
+float3 CubicBezierSum(const OutputPatch<HullOut, 16> bezPatch, float4 basisU, float4 basisV)
+{
+	float3 sum = float3(0.0f, 0.0f, 0.0f);
+	sum = basisV.x * ((basisU.x * bezPatch[0].PosL) + (basisU.y * bezPatch[1].PosL) + (basisU.z * bezPatch[2].PosL) + (basisU.w * bezPatch[3].PosL));
+	sum += basisV.y * ((basisU.x * bezPatch[4].PosL) + (basisU.y * bezPatch[5].PosL) + (basisU.z * bezPatch[6].PosL) + (basisU.w * bezPatch[7].PosL));
+	sum += basisV.z * ((basisU.x * bezPatch[8].PosL) + (basisU.y * bezPatch[9].PosL) + (basisU.z * bezPatch[10].PosL) + (basisU.w * bezPatch[11].PosL));
+	sum += basisV.w * ((basisU.x * bezPatch[12].PosL) + (basisU.y * bezPatch[13].PosL) + (basisU.z * bezPatch[14].PosL) + (basisU.w * bezPatch[15].PosL));
+
+	return sum;
+}
+
+float4 dBernsteinBasis(float t)
+{
+	float invT = 1.0f - t;
+
+	return float4(
+		-3 * invT * invT,
+		3 * invT * (invT - 6) * t * invT,
+		6 * t * (invT - 3) * t * t,
+		3 * t * t);
+}
+
 [domain("quad")]
 DomainOut DS(PatchTess patchTess,
 	float2 uv : SV_DomainLocation,
@@ -113,13 +165,21 @@ DomainOut DS(PatchTess patchTess,
 
 	MaterialData matData = gMaterialData[gMaterialIndex];
 
+	float4 basisU = BernsteinBasis(uv.x);
+	float4 basisV = BernsteinBasis(uv.y);
+
+	float4 dbasisU = dBernsteinBasis(uv.x);
+	float4 dbasisV = dBernsteinBasis(uv.y);
+
+	float3 p = CubicBezierSum(quad, basisU, basisV);
+
 	float3 v1 = lerp(quad[0].PosL, quad[3].PosL, uv.x);
 	float3 v2 = lerp(quad[12].PosL, quad[15].PosL, uv.x);
 
 	float2 t1 = lerp(quad[0].TexC, quad[3].TexC, uv.x);
 	float2 t2 = lerp(quad[12].TexC, quad[15].TexC, uv.x);
 
-	float3 p = lerp(v1, v2, uv.y);
+//	float3 p = lerp(v1, v2, uv.y);
 	float2 t = lerp(t1, t2, uv.y);
 
 	float2 tt = t - (gTotalTime * 0.005f);
@@ -129,7 +189,7 @@ DomainOut DS(PatchTess patchTess,
 	col = 2.0f * col - 1.0f;
 	float4 col1 = gHeightMaps[3].SampleLevel(gsamAnisotropicWrap, tp, 0);
 	col1 = 2.0f * col1 - 1.0f;
-	p.y = col.a + col1.a;
+	p.y += col.a + col1.a;
 
 	float4 PosW = mul(float4(p, 1.0f), gWorld);
 	dOut.PosW = PosW.xyz;
