@@ -87,12 +87,9 @@ float4 PS(VertexOut pin) : SV_Target
 
 	litColor.a = diffuseAlbedo.a;
 
-	if ((saturate(uv.x) == uv.x) && (saturate(uv.y) == uv.y))
-	{
-		float4 color = gShadowMap.Sample(gsamPointWrap, uv);
-		litColor += color;
-	}
 
+	float4 color = gShadowMap.Sample(gsamBorder, uv);
+	litColor *= color;
 
 	return litColor;
 }

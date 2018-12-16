@@ -39,7 +39,6 @@ SamplerState gsamLinearClamp      : register(s3);
 SamplerState gsamAnisotropicWrap  : register(s4);
 SamplerState gsamAnisotropicClamp : register(s5);
 SamplerComparisonState gsamShadow : register(s6);
-SamplerState gsamBorder			  : register(s7);
 
 cbuffer cbPerObject : register(b0)
 {

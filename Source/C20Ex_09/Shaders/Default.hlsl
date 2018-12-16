@@ -4,7 +4,7 @@
 struct VertexIn
 {
 	float3 PosL    : POSITION;
-	float3 NormalL : NORMAL;
+    float3 NormalL : NORMAL;
 	float2 TexC	   : TEXCOORD;
 	float3 TangentU : TANGENT;
 };
@@ -83,16 +83,7 @@ float4 PS(VertexOut pin) : SV_Target
 	float3 fresnelFactor = SchlickFresnel(fresnelR0, bumpedNormalW, r);
 	litColor.rgb += shininess * fresnelFactor * reflectionColor.rgb;
 
-	float2 uv = pin.ShadowPosH.xy /= pin.ShadowPosH.w;
-
 	litColor.a = diffuseAlbedo.a;
-
-	if ((saturate(uv.x) == uv.x) && (saturate(uv.y) == uv.y))
-	{
-		float4 color = gShadowMap.Sample(gsamPointWrap, uv);
-		litColor += color;
-	}
-
 
 	return litColor;
 }

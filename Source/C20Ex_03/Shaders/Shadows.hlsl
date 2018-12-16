@@ -1,5 +1,12 @@
 
+
 #include "common.hlsl"
+
+#undef NUM_DIR_LIGHTS
+#define NUM_DIR_LIGHTS 0
+
+#undef NUM_SPOT_LIGHTS
+#define NUM_SPOT_LIGHTS 1
 
 struct VertexIn
 {
@@ -12,7 +19,6 @@ struct VertexIn
 struct VertexOut
 {
 	float4 PosH    : SV_POSITION;
-	float4 ShadowPosH : POSITION0;
 	float3 PosW    : POSITION1;
 	float3 NormalW : NORMAL;
 	float3 TangentW : TANGENT;
@@ -37,10 +43,22 @@ VertexOut VS(VertexIn vin)
 	float4 texC = mul(float4(vin.TexC, 0.0f, 1.0f), gTexTransform);
 	vout.TexC = mul(texC, matData.MatTransform).xy;
 
-	vout.ShadowPosH = mul(posW, gShadowTransform);
-
 	return vout;
 }
+
+//float4 PS(VertexOut pin) : SV_Target
+//{
+//	MaterialData matData = gMaterialData[gMaterialIndex];
+//	float4 diffuseAlbedo = matData.DiffuseAlbedo;
+//	uint diffuseMapIndex = matData.DiffuseMapIndex;
+//
+//	diffuseAlbedo *= gTextureMaps[diffuseMapIndex].Sample(gsamAnisotropicWrap, pin.TexC);
+//
+//#ifdef ALPHA_TEST
+//	clip(diffuseAlbedo.a - 0.1f);
+//#endif
+//	return diffuseAlbedo;
+//}
 
 float4 PS(VertexOut pin) : SV_Target
 {
@@ -49,52 +67,28 @@ float4 PS(VertexOut pin) : SV_Target
 	float3 fresnelR0 = matData.FresnelR0;
 	float roughness = matData.Roughness;
 	uint diffuseTexIndex = matData.DiffuseMapIndex;
-	uint normalMapIndex = matData.NormalMapIndex;
 
-	diffuseAlbedo *= gTextureMaps[diffuseTexIndex].Sample(gsamLinearWrap, pin.TexC);
-
-#ifdef ALPHA_TEST
+	#ifdef ALPHA_TEST
 	clip(diffuseAlbedo.a - 0.1f);
-#endif
+	#endif
 
 	pin.NormalW = normalize(pin.NormalW);
-
-	float4 normalMapSample = gTextureMaps[normalMapIndex].Sample(gsamAnisotropicWrap, pin.TexC);
-	float3 bumpedNormalW = NormalSampleToWorldSpace(normalMapSample.rgb, pin.NormalW, pin.TangentW);
-
 
 	float3 toEyeW = normalize(gEyePosW - pin.PosW);
 
 	float4 ambient = gAmbientLight * diffuseAlbedo;
 
-	const float shininess = (1.0f - roughness) * normalMapSample.a;
+	const float shininess = (1.0f - roughness);
 	Material mat = { diffuseAlbedo, fresnelR0, shininess };
 
 	float3 shadowFactor = float3(1.0f, 1.0f, 1.0f);
-	shadowFactor[0] = CalcShadowFactor(pin.ShadowPosH);
 
 	float4 directLight = ComputeLighting(gLights, mat, pin.PosW,
-		bumpedNormalW, toEyeW, shadowFactor);
+		pin.NormalW, toEyeW, shadowFactor);
 
 	float4 litColor = ambient + directLight;
 
-	float3 r = reflect(-toEyeW, bumpedNormalW);
-	float4 reflectionColor = gCubeMap.Sample(gsamLinearWrap, r);
-	float3 fresnelFactor = SchlickFresnel(fresnelR0, bumpedNormalW, r);
-	litColor.rgb += shininess * fresnelFactor * reflectionColor.rgb;
-
-	float2 uv = pin.ShadowPosH.xy /= pin.ShadowPosH.w;
-
-	litColor.a = diffuseAlbedo.a;
-
-	if ((saturate(uv.x) == uv.x) && (saturate(uv.y) == uv.y))
-	{
-		float4 color = gShadowMap.Sample(gsamPointWrap, uv);
-		litColor += color;
-	}
-
+//	litColor.a = diffuseAlbedo.a;
 
 	return litColor;
 }
-
-
